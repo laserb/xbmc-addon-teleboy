@@ -1,7 +1,7 @@
 
 import os, re, sys, base64
 import cookielib, urllib, urllib2
-import xbmcgui, xbmcplugin, xbmcaddon
+import xbmc, xbmcgui, xbmcplugin, xbmcaddon
 from mindmade import *
 import simplejson
 
@@ -144,6 +144,7 @@ def addDirectoryItem( name, params={}, image="", total=0, isFolder=False):
     for k in params.keys():
         params_encoded[k] = params[k].encode( "utf-8")
     url = sys.argv[0] + '?' + urllib.urlencode( params_encoded)
+    #xbmc.log("%s=%s" % (name,url))
     return xbmcplugin.addDirectoryItem(handle=pluginhandle, url=url, listitem=li, isFolder = isFolder, totalItems=total)
 ###########
 # END TEMP
@@ -168,13 +169,16 @@ def show_main():
 
     content = fetchApiJson( user_id, "broadcasts/now", { "expand": "flags,station,previewImage", "stream": True })
     print( repr(content))
-    for item in content["data"]["items"]:
+    for item in sorted(content["data"]["items"], key=lambda x: x["station"]["name"]):
         channel = item["station"]["name"]
         station_id = str(item["station"]["id"])
         title   = item["title"]
         tstart  = item["begin"][11:16]
         tend    = item["end"][11:16]
-        label   = channel + ": " + title + " (" + tstart + "-" + tend +")"
+        if settings.getSetting('epg') == 'true':
+            label   = channel + ": " + title + " (" + tstart + "-" + tend +")"
+        else:
+            label   = channel
         img     = get_stationLogoURL( station_id)
         addDirectoryItem( label, { PARAMETER_KEY_STATION: station_id,
                           PARAMETER_KEY_MODE: MODE_PLAY,

@@ -5,6 +5,7 @@
   <category label="30100">
   	<setting id="login" type="text" label="30110" />
     <setting id="password" type="text" label="30111" option="hidden"/>
+    <setting id="epg" label="EPG" type="bool" default="true" />
   </category>
 
 </settings>
