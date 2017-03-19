@@ -41,9 +41,15 @@ def ensure_login():
     urllib2.install_opener( opener)
     try:
         cookies.revert( ignore_discard=True)
+        found_cookie = False
         for c in cookies:
-            if c.name == "cinergy_auth":
-                return True
+            if c.name == "cinergy_auth" and not c.is_expired():
+                found_cookie = True
+                break
+        if found_cookie:
+            for c in cookies:
+                if c.name == "cinergy_s" and not c.is_expired():
+                    return True
     except IOError:
         pass
     cookies.clear()
