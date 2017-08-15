@@ -155,8 +155,8 @@ def show_main():
     user_id = ""
     lines = html.split( '\n')
     for line in lines:
-        if "id: " in line:
-            dummy, uid = line.split( ": ")
+        if "setId" in line:
+            dummy, uid = line.split("(")
             user_id = uid[:-1]
             log( "user id: " + user_id)
             break;
