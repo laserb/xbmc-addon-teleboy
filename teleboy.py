@@ -62,8 +62,9 @@ def ensure_login():
     args = { "login": login,
              "password": password,
              "keep_login": "1" }
+    hdrs = { "Referer": TB_URL }
 
-    reply = fetchHttp( url, args, post=True);
+    reply = fetchHttp( url, args, hdrs, post=True);
 
     if "Falsche Eingaben" in reply or "Anmeldung war nicht erfolgreich" in reply:
         log( "login failure")
