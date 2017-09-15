@@ -5,14 +5,11 @@ import base64
 import cookielib
 import urllib
 import urllib2
-import HTMLParser
-import re
 import xbmc
 import xbmcgui
 import xbmcplugin
 import xbmcaddon
 import simplejson
-import datetime
 
 __author__ = "Andreas Wetzel"
 __copyright__ = "Copyright 2011-2015, mindmade.org"
@@ -24,9 +21,6 @@ __email__ = "xbmc@mindmade.org"
 # constants definition
 ############################################
 PLUGINID = "plugin.video.teleboy"
-
-addon = xbmcaddon.Addon()
-LOGFILE = os.path.join(addon.getAddonInfo('path'), "resources", "log.txt")
 
 MODE_RECORDINGS = "recordings"
 MODE_PLAY = "play"
@@ -70,7 +64,7 @@ def ensure_login():
     cookies.clear()
     fetchHttp(TB_URL + "/login")
 
-    log("logging in...")
+    xbmc.log("logging in...", level=xbmc.LOGNOTICE)
     login = settings.getSetting(id="login")
     password = settings.getSetting(id="password")
     url = TB_URL + "/login_check"
@@ -83,15 +77,16 @@ def ensure_login():
 
     if "Falsche Eingaben" in reply \
             or "Anmeldung war nicht erfolgreich" in reply:
-        log("login failure")
-        log(reply)
-        notify("Login Failure!",
-               "Please set your login/password in the addon settings")
+        xbmc.log("login failure", level=xbmc.LOGNOTICE)
+        xbmc.log(reply, level=xbmc.LOGNOTICE)
+        xbmc.executebuiltin("XBMC.Notification({},{})".format(
+                "Login Failure!",
+                "Please set your login/password in the addon settings"))
         xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=False)
         return False
     cookies.save(ignore_discard=True)
 
-    log("login ok")
+    xbmc.log("login ok", level=xbmc.LOGNOTICE)
     return True
 
 
@@ -122,8 +117,9 @@ def fetchApiJson(user_id, url, args={}):
             break
 
     if (session_cookie == ""):
-        notify("Session cookie not found!",
-               "Please set your login/password in the addon settings")
+        xbmc.executebuiltin("XBMC.Notification({},{})".format(
+                "Session cookie not found!",
+                "Please set your login/password in the addon settings"))
         return False
 
     hdrs = {"x-teleboy-apikey": API_KEY,
@@ -160,7 +156,7 @@ def addDirectoryItem(name, params={}, image="", total=0, isFolder=False):
     if image != "":
         img = image
 
-    name = htmldecode(name)
+    name = name.encode('utf8')
     li = xbmcgui.ListItem(name, iconImage=img, thumbnailImage=image)
 
     if not isFolder:
@@ -191,7 +187,7 @@ def show_main():
         if "setId" in line:
             dummy, uid = line.split("(")
             user_id = uid[:-1]
-            log("user id: " + user_id)
+            xbmc.log("user id: " + user_id, level=xbmc.LOGNOTICE)
             break
 
     addDirectoryItem("[ Recordings ]", {PARAMETER_KEY_MODE: MODE_RECORDINGS,
@@ -243,44 +239,12 @@ def play_url(url, title, img=""):
 
     xbmc.Player().play(url, li)
 
-# Tools
-
-
-def log(msg):
-    msg = msg.encode("latin-1")
-    logf = open(LOGFILE, "a")
-    logf.write("%s: " % datetime.datetime.now().strftime("%Y-%m-%d %I:%M:%S"))
-    logf.write(msg)
-    logf.write('\n')
-    logf.close()
-    xbmc.log("### %s" % msg, level=xbmc.LOGNOTICE)
-
-
-def notify(title, message):
-    xbmc.executebuiltin("XBMC.Notification(" + title + "," + message + ")")
-
-
-entitydict = {"E4": u"\xE4", "F6": u"\xF6", "FC": u"\xFC",
-              "C4": u"\xE4", "D6": u"\xF6", "DC": u"\xDC",
-              "2013": u"\u2013"}
-
-
-def htmldecode(s):
-    try:
-        h = HTMLParser.HTMLParser()
-        s = h.unescape(s)
-        for k in entitydict.keys():
-            s = s.replace("&#x" + k + ";", entitydict[k])
-    except UnicodeDecodeError:
-        pass
-
-    return s
-
 
 def fetchHttp(url, args={}, hdrs={}, post=False):
-    log("fetchHttp(%s): %s" % ("POST" if post else "GET", url))
+    xbmc.log("fetchHttp(%s): %s" % ("POST" if post else "GET", url),
+             level=xbmc.LOGNOTICE)
     if args:
-        log("args-keys: %s" % args.keys())
+        xbmc.log("args-keys: %s" % args.keys(), level=xbmc.LOGNOTICE)
     hdrs["User-Agent"] = "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/20100101 Firefox/5.0"  # noqa: E501
     if post:
         req = urllib2.Request(url, urllib.urlencode(args), hdrs)
@@ -288,13 +252,8 @@ def fetchHttp(url, args={}, hdrs={}, post=False):
         url = url + "?" + urllib.urlencode(args)
         req = urllib2.Request(url, None, hdrs)
     response = urllib2.urlopen(req)
-    encoding = re.findall(
-        "charset=([a-zA-Z0-9\-]+)", response.headers['content-type'])
     text = response.read()
-    if len(encoding):
-        responsetext = unicode(text, encoding[0])  # noqa: F821
-    else:
-        responsetext = text
+    responsetext = text.decode('utf8')
     response.close()
 
     return responsetext
