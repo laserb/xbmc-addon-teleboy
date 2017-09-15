@@ -193,8 +193,8 @@ def show_main():
             xbmc.log("user id: " + user_id, level=xbmc.LOGNOTICE)
             break
 
-    addDirectoryItem("[ Recordings ]", {PARAMETER_KEY_MODE: MODE_RECORDINGS,
-                                        PARAMETER_KEY_USERID: user_id},
+    addDirectoryItem("[ Aufnahmen ]", {PARAMETER_KEY_MODE: MODE_RECORDINGS,
+                                       PARAMETER_KEY_USERID: user_id},
                      isFolder=True)
 
     content = fetchApiJson(user_id, "broadcasts/now",
