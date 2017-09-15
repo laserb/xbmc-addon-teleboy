@@ -26,6 +26,7 @@ PLUGINID = "plugin.video.teleboy"
 MODE_RECORDINGS = "recordings"
 MODE_PLAY = "play"
 MODE_PLAY_RECORDING = "playrec"
+MODE_DELETE = "delete"
 PARAMETER_KEY_MODE = "mode"
 PARAMETER_KEY_STATION = "station"
 PARAMETER_KEY_USERID = "userid"
@@ -303,7 +304,20 @@ def show_recordings(user_id):
         li.setInfo('video', info)
 
         # add refresh option
-        li.addContextMenuItems([('Refresh', 'Container.Refresh')])
+        context_menu = [('Refresh', 'Container.Refresh')]
+
+        # add delete option
+        script_path = xbmc.translatePath("special://home/addons/{}/teleboy.py"
+                                         .format(PLUGINID))
+        params = {PARAMETER_KEY_MODE: MODE_DELETE,
+                  PARAMETER_KEY_USERID: user_id,
+                  PARAMETER_KEY_RECID: recid}
+        context_menu.append(('Delete', 'RunScript({}, {}, ?{})'
+                             .format(script_path,
+                                     pluginhandle,
+                                     urllib.urlencode(params))))
+
+        li.addContextMenuItems(context_menu)
 
         params = {PARAMETER_KEY_MODE: MODE_PLAY_RECORDING,
                   PARAMETER_KEY_USERID: user_id,
@@ -343,6 +357,31 @@ def fetchHttp(url, args={}, hdrs={}, post=False):
     return responsetext
 
 
+def delete_record(user_id, recid):
+    # get session key from cookie
+    global cookies
+    cookies.revert(ignore_discard=True)
+    session_cookie = ""
+    for c in cookies:
+        if c.name == "cinergy_s":
+            session_cookie = c.value
+            break
+
+    if (session_cookie == ""):
+        xbmc.executebuiltin("XBMC.Notification({},{})".format(
+                "Session cookie not found!",
+                "Please set your login/password in the addon settings"))
+        return False
+
+    hdrs = {"x-teleboy-apikey": API_KEY,
+            "x-teleboy-session": session_cookie}
+    url = API_URL + "/users/%s/records/%s" % (user_id, recid)
+    hdrs["User-Agent"] = "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/20100101 Firefox/5.0"  # noqa: E501
+    req = urllib2.Request(url, None, hdrs)
+    req.get_method = lambda: 'DELETE'
+    urllib2.urlopen(req)
+
+
 #
 # xbmc entry point
 ############################################
@@ -353,6 +392,13 @@ mode = params.get(PARAMETER_KEY_MODE, "0")
 if not sys.argv[2]:
     # new start
     ok = show_main()
+
+elif mode == MODE_DELETE:
+    user_id = params[PARAMETER_KEY_USERID]
+    recid = params[PARAMETER_KEY_RECID]
+    xbmc.log("[delete {} {}]".format(user_id, recid), level=xbmc.LOGNOTICE)
+    delete_record(user_id, recid)
+    xbmc.executebuiltin("Container.Refresh")
 
 elif mode == MODE_RECORDINGS:
     user_id = params[PARAMETER_KEY_USERID]
