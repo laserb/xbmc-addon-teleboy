@@ -24,6 +24,7 @@ __email__ = "xbmc@mindmade.org"
 PLUGINID = "plugin.video.teleboy"
 
 MODE_RECORDINGS = "recordings"
+MODE_LIVE = "live"
 MODE_PLAY = "play"
 MODE_PLAY_RECORDING = "playrec"
 MODE_DELETE = "delete"
@@ -193,10 +194,17 @@ def show_main():
             xbmc.log("user id: " + user_id, level=xbmc.LOGNOTICE)
             break
 
-    addDirectoryItem("[ Aufnahmen ]", {PARAMETER_KEY_MODE: MODE_RECORDINGS,
-                                       PARAMETER_KEY_USERID: user_id},
+    addDirectoryItem("Aufnahmen", {PARAMETER_KEY_MODE: MODE_RECORDINGS,
+                                   PARAMETER_KEY_USERID: user_id},
                      isFolder=True)
 
+    addDirectoryItem("Live", {PARAMETER_KEY_MODE: MODE_LIVE,
+                              PARAMETER_KEY_USERID: user_id},
+                     isFolder=True)
+    xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
+
+
+def show_live(user_id):
     content = fetchApiJson(user_id, "broadcasts/now",
                            {"expand": "flags,station,previewImage",
                             "stream": True})
@@ -403,6 +411,10 @@ elif mode == MODE_DELETE:
 elif mode == MODE_RECORDINGS:
     user_id = params[PARAMETER_KEY_USERID]
     show_recordings(user_id)
+
+elif mode == MODE_LIVE:
+    user_id = params[PARAMETER_KEY_USERID]
+    show_live(user_id)
 
 elif mode == MODE_PLAY:
     user_id = params[PARAMETER_KEY_USERID]
