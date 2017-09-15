@@ -5,6 +5,7 @@ import base64
 import cookielib
 import urllib
 import urllib2
+from dateutil.parser import parse
 import xbmc
 import xbmcgui
 import xbmcplugin
@@ -32,6 +33,7 @@ PARAMETER_KEY_RECID = "recid"
 
 TB_URL = "https://www.teleboy.ch"
 IMG_URL = "http://media.cinergy.ch"
+THUMBNAIL_URL = "https://media.service.teleboy.ch/media/teleboyteaser8/{}.jpg"
 API_URL = "http://tv.api.teleboy.ch"
 API_KEY = base64.b64decode(
         "ZjBlN2JkZmI4MjJmYTg4YzBjN2ExM2Y3NTJhN2U4ZDVjMzc1N2ExM2Y3NTdhMTNmOWMwYzdhMTNmN2RmYjgyMg==")  # noqa: E501
@@ -217,17 +219,96 @@ def show_main():
 
 
 def show_recordings(user_id):
-    content = fetchApiJson(user_id, "records/ready", {"limit": 500, "skip": 0})
+    content = fetchApiJson(user_id, "records/ready",
+                           {"expand": "station",
+                            "limit": 500,
+                            "skip": 0})
 
     for item in content["data"]["items"]:
-        starttime = item["begin"].split("+")[0][:-3].replace("T", " ")
-        label = starttime + " " + item["title"]
-        if "label" in item.keys():
-            label = starttime + " " + item["label"] + ": " + item["title"]
+        station = item['station']
+
+        # set label
+        starttime = parse(item["begin"])
+        endtime = parse(item['end'])
+        titlestring = '[B]{}[/B]'.format(item["title"].encode('utf8'))
+        if item['subtitle']:
+            titlestring += ' - {}'.format(item["subtitle"].encode('utf8'))
+
+        datestring = starttime.strftime("%d.%m.%y %H:%M")
+        label = "{}[CR][COLOR darkgray]{} {}[/COLOR]".format(titlestring,
+                                                             datestring,
+                                                             station['name'])
         recid = str(item["id"])
-        addDirectoryItem(label, {PARAMETER_KEY_MODE: MODE_PLAY_RECORDING,
-                                 PARAMETER_KEY_USERID: user_id,
-                                 PARAMETER_KEY_RECID: recid})
+
+        # set image
+        broadcast = fetchApiJson(user_id,
+                                 "broadcasts/{}".format(item["broadcast_id"]),
+                                 {"expand": "previewImage"})
+        broadcast = broadcast["data"]
+
+        images = broadcast.get("teleboy_images", [])
+        img = ""
+        if not images:
+            images = broadcast.get("images", [])
+        if images:
+            img = THUMBNAIL_URL.format(images[0]["hash"])
+
+        preview = ""
+        if "preview_image" in broadcast:
+            preview = THUMBNAIL_URL.format(broadcast["preview_image"]["hash"])
+
+        primary_image = ""
+        if "primary_image" in broadcast:
+            primary_image = THUMBNAIL_URL \
+                    .format(broadcast["primary_image"]["hash"])
+
+        if not img and not preview and not primary_image:
+            img = "DefaultVideo.png"
+            preview = img
+        elif not img and not preview and primary_image:
+            img = primary_image
+            preview = primary_image
+        elif not img and preview:
+            img = preview
+        elif img and not preview:
+            preview = img
+
+        li = xbmcgui.ListItem(label, iconImage=preview, thumbnailImage=preview)
+        li.setArt({'thumb': preview, 'poster': img, 'fanart': img})
+        li.setProperty("Video", "true")
+
+        # show video information
+        duration = endtime - starttime
+        info = {
+            'title': item['title'],
+            'plot': item['info_5'],
+            'plotoutline': item['info'],
+            'duration': duration.total_seconds(),
+            'studio': station['name'],
+            'genre': item['genre'],
+            'director': item.get('director'),
+        }
+        episode = item.get('episode', '')
+        if episode:
+            info['episode'] = episode
+        cast = item.get('cast', '')
+        anchor = item.get('anchor', '')
+        if anchor:
+            if cast:
+                cast += ',%s' % anchor
+            else:
+                cast = anchor
+        if cast:
+            info['cast'] = cast.split(',')
+        li.setInfo('video', info)
+
+        params = {PARAMETER_KEY_MODE: MODE_PLAY_RECORDING,
+                  PARAMETER_KEY_USERID: user_id,
+                  PARAMETER_KEY_RECID: recid}
+        url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
+        xbmcplugin.addDirectoryItem(handle=pluginhandle,
+                                    url=url,
+                                    listitem=li)
 
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
