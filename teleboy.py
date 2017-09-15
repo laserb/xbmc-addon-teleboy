@@ -302,6 +302,9 @@ def show_recordings(user_id):
             info['cast'] = cast.split(',')
         li.setInfo('video', info)
 
+        # add refresh option
+        li.addContextMenuItems([('Refresh', 'Container.Refresh')])
+
         params = {PARAMETER_KEY_MODE: MODE_PLAY_RECORDING,
                   PARAMETER_KEY_USERID: user_id,
                   PARAMETER_KEY_RECID: recid}
