@@ -160,7 +160,6 @@ def addDirectoryItem(name, params={}, image="", total=0, isFolder=False):
     if image != "":
         img = image
 
-    name = name.encode('utf8')
     li = xbmcgui.ListItem(name, iconImage=img, thumbnailImage=image)
 
     if not isFolder:
@@ -208,22 +207,29 @@ def show_live(user_id):
     content = fetchApiJson(user_id, "broadcasts/now",
                            {"expand": "flags,station,previewImage",
                             "stream": True})
-    print(repr(content))
-    for item in sorted(content["data"]["items"],
-                       key=lambda x: x["station"]["name"]):
-        channel = item["station"]["name"]
+    for item in content["data"]["items"]:
+        channel = item["station"]["name"].encode('utf8')
         station_id = str(item["station"]["id"])
-        title = item["title"]
+        title = item["title"].encode('utf8')
         tstart = item["begin"][11:16]
         tend = item["end"][11:16]
         if settings.getSetting('epg') == 'true':
-            label = channel + ": " + title + " (" + tstart + "-" + tend + ")"
+            label = "[B]{}[/B][CR]{} [COLOR darkgray]({} - {})[/COLOR]" \
+                    .format(channel, title, tstart, tend)
         else:
             label = channel
         img = get_stationLogoURL(station_id)
-        addDirectoryItem(label, {PARAMETER_KEY_STATION: station_id,
-                                 PARAMETER_KEY_MODE: MODE_PLAY,
-                                 PARAMETER_KEY_USERID: user_id}, img)
+        preview = THUMBNAIL_URL.format(item['preview_image']['hash'])
+        li = xbmcgui.ListItem(label, iconImage=preview, thumbnailImage=preview)
+        li.setArt({'thumb': preview, 'poster': img, 'fanart': img})
+        li.setProperty("Video", "true")
+        params = {PARAMETER_KEY_STATION: station_id,
+                  PARAMETER_KEY_MODE: MODE_PLAY,
+                  PARAMETER_KEY_USERID: user_id}
+        url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
+        xbmcplugin.addDirectoryItem(handle=pluginhandle,
+                                    url=url,
+                                    listitem=li)
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
