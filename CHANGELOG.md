@@ -1,3 +1,16 @@
+<a name="1.0.0"></a>
+# [1.0.0](https://github.com/laserb/xbmc-addon-teleboy/compare/0.3.6...1.0.0) (2017-09-16)
+
+
+### Features
+
+* **live:** use user defined order and show images ([deb322f](https://github.com/laserb/xbmc-addon-teleboy/commit/deb322f))
+* **recordings:** add more informations and images ([ee53b84](https://github.com/laserb/xbmc-addon-teleboy/commit/ee53b84))
+* **recordings:** add option to delete record ([aee2f24](https://github.com/laserb/xbmc-addon-teleboy/commit/aee2f24))
+* **recordings:** add refresh options to list item ([b584076](https://github.com/laserb/xbmc-addon-teleboy/commit/b584076))
+
+
+
 # 0.3.6
   * another fix for login and authentication. patch from weismw. thank you!
 
