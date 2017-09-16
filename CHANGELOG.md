@@ -1,60 +1,60 @@
-version 0.3.6
+# 0.3.6
   * another fix for login and authentication. patch from weismw. thank you!
 
-version 0.3.5
+# 0.3.5
   * quick fix for login issue.
 
-version 0.3.4
+# 0.3.4
   * applied quick fix for channel overview. patch provided by os299. thank you!
 
-version 0.3.3
+# 0.3.3
   * do not crash when listing recordings without a "label" property
 
-version 0.3.2
+# 0.3.2
   * use new teleboy json api - as seen in reduzents (who else ;) watchteleboy script
 
-version 0.3.1
+# 0.3.1
 
   * quick fix for login issue, patch provided by primaeval. thank you!
 
-version 0.3.0
+# 0.3.0
 
   * adapt to new http streaming, based on watchteleboy script from reduzent. thank you!
     (https://github.com/reduzent/watchteleboy)
 
-version 0.2.6
+# 0.2.6
 
   * adapted to new website layout.
     (patch by stunna, thank you!)
 
-version 0.2.5
+# 0.2.5
 
   * skip unparseable channel entries in main channel list
 
-version 0.2.4
+# 0.2.4
 
   * applied patch from francois (again ;) to work with new teleboy homepage
   * fixed dependencies for xbmc frodo
 
-version 0.2.3
+# 0.2.3
 
   * adapted html parsing to new teleboy website
     (patch by francois marbot, thank you!)
   * minor improvements & anonymous (check source!) usage statistics
 
-version 0.2.2
+# 0.2.2
 
   * reworked authentication and cookie retrieval
 
-version 0.2.1
+# 0.2.1
 
   * reworked html parser for new teleboy webpage format
 
-version 0.2.0
+# 0.2.0
 
   * reworked scraper for new teleboy player 1.2.2
   * save/reuse login cookie
 
-version 0.1.0
+# 0.1.0
 
   * initial release

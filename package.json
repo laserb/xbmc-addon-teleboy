@@ -1,0 +1,24 @@
+{
+  "name": "xbmc-addon-teleboy",
+  "version": "1.0.0",
+  "description": "Teleboy Live-TV for Kodi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/laserb/xbmc-addon-teleboy.git"
+  },
+  "author": "Raphael Freudiger",
+  "license": "GPLv3",
+  "bugs": {
+    "url": "https://github.com/laserb/xbmc-addon-teleboy/issues"
+  },
+  "homepage": "https://github.com/laserb/xbmc-addon-teleboy#readme",
+  "dependencies": {
+    "conventional-changelog-cli": "^1.3.3"
+  },
+  "scripts": {
+      "changelog": "conventional-changelog -i CHANGELOG.md -p angular -s",
+      "update_version": "sed -i 's/    version=\"[^\"]*\"/    version=\"'$npm_package_version'\"/g' addon.xml",
+      "tag": "git add CHANGELOG.md && git commit -m 'Release version '$npm_package_version && git tag 'v'$npm_package_version",
+      "release": "npm run update_version && npm run changelog && npm run tag"
+  }
+}
