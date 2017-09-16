@@ -5,6 +5,7 @@ import base64
 import cookielib
 import urllib
 import urllib2
+import urlparse
 from dateutil.parser import parse
 import xbmc
 import xbmcgui
@@ -136,27 +137,6 @@ def fetchApiJson(user_id, url, args={}):
 def get_videoJson(user_id, sid):
     url = "stream/live/%s" % sid
     return fetchApiJson(user_id, url, {"alternative": "false"})
-
-############
-# TEMP
-############
-
-
-def parameters_string_to_dict(parameters):
-    ''' Convert parameters encoded in a URL to a dict. '''
-    paramDict = {}
-    if parameters:
-        paramPairs = parameters[1:].split("&")
-        for paramsPair in paramPairs:
-            paramSplits = paramsPair.split('=')
-            if (len(paramSplits)) == 2:
-                paramDict[paramSplits[0]] = urllib.unquote(paramSplits[1])
-    return paramDict
-
-
-###########
-# END TEMP
-###########
 
 
 def show_main():
@@ -391,8 +371,10 @@ def delete_record(user_id, recid):
 #
 # xbmc entry point
 ############################################
-params = parameters_string_to_dict(sys.argv[2])
-mode = params.get(PARAMETER_KEY_MODE, "0")
+params = urlparse.parse_qs(sys.argv[2][1:])
+mode = params.get(PARAMETER_KEY_MODE, "[0]")[0]
+user_id = params.get(PARAMETER_KEY_USERID, "[0]")[0]
+recid = params.get(PARAMETER_KEY_RECID, "[0]")[0]
 
 # depending on the mode, call the appropriate function to build the UI.
 if not sys.argv[2]:
@@ -400,23 +382,18 @@ if not sys.argv[2]:
     ok = show_main()
 
 elif mode == MODE_DELETE:
-    user_id = params[PARAMETER_KEY_USERID]
-    recid = params[PARAMETER_KEY_RECID]
     xbmc.log("[delete {} {}]".format(user_id, recid), level=xbmc.LOGNOTICE)
     delete_record(user_id, recid)
     xbmc.executebuiltin("Container.Refresh")
 
 elif mode == MODE_RECORDINGS:
-    user_id = params[PARAMETER_KEY_USERID]
     show_recordings(user_id)
 
 elif mode == MODE_LIVE:
-    user_id = params[PARAMETER_KEY_USERID]
     show_live(user_id)
 
 elif mode == MODE_PLAY:
-    user_id = params[PARAMETER_KEY_USERID]
-    station = params[PARAMETER_KEY_STATION]
+    station = params[PARAMETER_KEY_STATION][0]
     json = get_videoJson(user_id, station)
     if not json:
         exit(1)
@@ -431,10 +408,7 @@ elif mode == MODE_PLAY:
     play_url(url, title, img)
 
 elif mode == MODE_PLAY_RECORDING:
-    user_id = params[PARAMETER_KEY_USERID]
-    rec_id = params[PARAMETER_KEY_RECID]
-
-    url = "stream/record/%s" % rec_id
+    url = "stream/record/%s" % recid
     json = fetchApiJson(user_id, url)
 
     title = json["data"]["record"]["title"]
