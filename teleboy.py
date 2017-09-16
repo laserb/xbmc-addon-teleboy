@@ -154,27 +154,6 @@ def parameters_string_to_dict(parameters):
     return paramDict
 
 
-def addDirectoryItem(name, params={}, image="", total=0, isFolder=False):
-    '''Add a list item to the XBMC UI.'''
-    img = "DefaultVideo.png"
-    if image != "":
-        img = image
-
-    li = xbmcgui.ListItem(name, iconImage=img, thumbnailImage=image)
-
-    if not isFolder:
-        li.setProperty("Video", "true")
-
-    params_encoded = dict()
-    for k in params.keys():
-        params_encoded[k] = params[k].encode("utf-8")
-    url = sys.argv[0] + '?' + urllib.urlencode(params_encoded)
-    # xbmc.log("%s=%s" % (name,url))
-    return xbmcplugin.addDirectoryItem(handle=pluginhandle,
-                                       url=url,
-                                       listitem=li,
-                                       isFolder=isFolder,
-                                       totalItems=total)
 ###########
 # END TEMP
 ###########
@@ -193,13 +172,26 @@ def show_main():
             xbmc.log("user id: " + user_id, level=xbmc.LOGNOTICE)
             break
 
-    addDirectoryItem("Aufnahmen", {PARAMETER_KEY_MODE: MODE_RECORDINGS,
-                                   PARAMETER_KEY_USERID: user_id},
-                     isFolder=True)
+    # add recordings directory
+    params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
+              PARAMETER_KEY_USERID: user_id}
+    url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
+    li = xbmcgui.ListItem("Aufnahmen")
+    xbmcplugin.addDirectoryItem(handle=pluginhandle,
+                                url=url,
+                                listitem=li,
+                                isFolder=True)
 
-    addDirectoryItem("Live", {PARAMETER_KEY_MODE: MODE_LIVE,
-                              PARAMETER_KEY_USERID: user_id},
-                     isFolder=True)
+    # add live directory
+    params = {PARAMETER_KEY_MODE: MODE_LIVE,
+              PARAMETER_KEY_USERID: user_id}
+    url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
+    li = xbmcgui.ListItem("Live")
+    xbmcplugin.addDirectoryItem(handle=pluginhandle,
+                                url=url,
+                                listitem=li,
+                                isFolder=True)
+
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
