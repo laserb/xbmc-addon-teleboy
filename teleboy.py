@@ -301,10 +301,18 @@ def show_recordings(user_id):
 
         li.addContextMenuItems(context_menu)
 
+        # get stream information
         url = "stream/record/%s" % recid
-        json = fetchApiJson(user_id, url)
+        stream = fetchApiJson(user_id, url)
+        url = stream["data"]["stream"]["url"]
 
-        url = json["data"]["stream"]["url"]
+        # set stream start to where the actual record starts
+        start_offset = float(stream["data"]["stream"]["offset_before"])
+        end_offset = float(stream["data"]["stream"]["offset_after"])
+        stream_duration = start_offset + duration.total_seconds() + end_offset
+        start_percent = 100*start_offset/stream_duration
+        li.setProperty("startPercent", str(start_percent))
+
         xbmcplugin.addDirectoryItem(handle=pluginhandle,
                                     url=url,
                                     listitem=li)
