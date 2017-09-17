@@ -13,11 +13,10 @@ import xbmcplugin
 import xbmcaddon
 import simplejson
 
-__author__ = "Andreas Wetzel"
-__copyright__ = "Copyright 2011-2015, mindmade.org"
-__credits__ = ["Roman Haefeli", "Francois Marbot"]
-__maintainer__ = "Andreas Wetzel"
-__email__ = "xbmc@mindmade.org"
+__author__ = "Raphael Freudiger"
+__credits__ = ["Andreas Wetzel"]
+__maintainer__ = "Raphael Freudiger"
+__email__ = "laser_b@gmx.ch"
 
 #
 # constants definition
