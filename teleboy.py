@@ -33,6 +33,7 @@ PARAMETER_KEY_MODE = "mode"
 PARAMETER_KEY_STATION = "station"
 PARAMETER_KEY_USERID = "userid"
 PARAMETER_KEY_RECID = "recid"
+PARAMETER_KEY_DURATION = "duration"
 
 TB_URL = "https://www.teleboy.ch"
 IMG_URL = "http://media.cinergy.ch"
@@ -307,7 +308,8 @@ def show_recordings(user_id):
 
         params = {PARAMETER_KEY_MODE: MODE_PLAY_RECORDING,
                   PARAMETER_KEY_USERID: user_id,
-                  PARAMETER_KEY_RECID: recid}
+                  PARAMETER_KEY_RECID: recid,
+                  PARAMETER_KEY_DURATION: duration.total_seconds()}
         url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
         xbmcplugin.addDirectoryItem(handle=pluginhandle,
                                     url=url,
@@ -316,10 +318,12 @@ def show_recordings(user_id):
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
-def play_url(url, title, img=""):
+def play_url(url, title, img="", start_percent=0):
     li = xbmcgui.ListItem(title, iconImage=img, thumbnailImage=img)
     li.setProperty("IsPlayable", "true")
     li.setProperty("Video", "true")
+
+    li.setProperty("startPercent", str(start_percent))
 
     xbmc.Player().play(url, li)
 
@@ -408,10 +412,17 @@ elif mode == MODE_PLAY:
     play_url(url, title, img)
 
 elif mode == MODE_PLAY_RECORDING:
+    duration = float(params[PARAMETER_KEY_DURATION][0])
     url = "stream/record/%s" % recid
     json = fetchApiJson(user_id, url)
 
     title = json["data"]["record"]["title"]
     url = json["data"]["stream"]["url"]
 
-    play_url(url, title)
+    # set stream start to where the actual record starts
+    start_offset = float(json["data"]["stream"]["offset_before"])
+    end_offset = float(json["data"]["stream"]["offset_after"])
+    stream_duration = start_offset + duration + end_offset
+    start_percent = 100.0*start_offset/stream_duration
+
+    play_url(url, title, start_percent=start_percent)
