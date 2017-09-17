@@ -42,6 +42,12 @@ API_KEY = base64.b64decode(
         "ZjBlN2JkZmI4MjJmYTg4YzBjN2ExM2Y3NTJhN2U4ZDVjMzc1N2ExM2Y3NTdhMTNmOWMwYzdhMTNmN2RmYjgyMg==")  # noqa: E501
 COOKIE_FILE = xbmc.translatePath(
     "special://home/addons/" + PLUGINID + "/resources/cookie.dat")
+RECORDINGS_FILE = xbmc.translatePath(
+    "special://home/addons/" + PLUGINID + "/resources/recordings.dat")
+RECORDINGS_BROADCASTS_FILE = xbmc.translatePath(
+        "special://home/addons/" + PLUGINID + "/resources/recordings_broadcasts.dat")  # noqa: E501
+REFRESH_LOCK_FILE = xbmc.translatePath(
+    "special://home/addons/" + PLUGINID + "/resources/refresh.lock")
 
 
 pluginhandle = int(sys.argv[1])
@@ -205,11 +211,26 @@ def show_live(user_id):
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
+def read_broadcasts():
+    broadcasts = {}
+    if os.path.exists(RECORDINGS_BROADCASTS_FILE):
+        with open(RECORDINGS_BROADCASTS_FILE, 'r') as f:
+            s = f.read()
+            if s:
+                broadcasts = simplejson.loads(s)
+    return broadcasts
+
+
 def show_recordings(user_id):
-    content = fetchApiJson(user_id, "records/ready",
-                           {"expand": "station",
-                            "limit": 500,
-                            "skip": 0})
+    updated, content = check_records_updated(user_id)
+
+    with open(RECORDINGS_FILE, 'w') as f:
+        simplejson.dump(content, f)
+
+    if updated:
+        fetch_records(user_id, content)
+
+    broadcasts = read_broadcasts()
 
     for item in content["data"]["items"]:
         station = item['station']
@@ -228,9 +249,7 @@ def show_recordings(user_id):
         recid = str(item["id"])
 
         # set image
-        broadcast = fetchApiJson(user_id,
-                                 "broadcasts/{}".format(item["broadcast_id"]),
-                                 {"expand": "previewImage"})
+        broadcast = broadcasts[str(item["broadcast_id"])]
         broadcast = broadcast["data"]
 
         images = broadcast.get("teleboy_images", [])
@@ -315,6 +334,40 @@ def show_recordings(user_id):
                                     listitem=li)
 
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
+
+
+def fetch_records(user_id, content):
+    old_broadcasts = read_broadcasts()
+    broadcasts = {}
+    for item in content["data"]["items"]:
+        broadcast_id = str(item["broadcast_id"])
+        if broadcast_id in old_broadcasts:
+            broadcast = old_broadcasts[broadcast_id]
+        else:
+            broadcast = fetchApiJson(user_id,
+                                     "broadcasts/{}".format(broadcast_id),
+                                     {"expand": "previewImage"})
+        broadcasts[broadcast_id] = broadcast
+    with open(RECORDINGS_BROADCASTS_FILE, 'w') as f:
+        simplejson.dump(broadcasts, f)
+
+
+def check_records_updated(user_id):
+    recordings = None
+    if os.path.exists(RECORDINGS_FILE):
+        with open(RECORDINGS_FILE, 'r') as f:
+            s = f.read()
+            if s:
+                recordings = simplejson.loads(s)
+    content = fetchApiJson(user_id, "records/ready",
+                           {"expand": "station",
+                            "limit": 500,
+                            "skip": 0})
+
+    if content != recordings:
+        xbmc.log("updated", level=xbmc.LOGDEBUG)
+        return True, content
+    return False, content
 
 
 def play_url(url, title, img="", start_percent=0):
