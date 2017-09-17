@@ -26,8 +26,6 @@ PLUGINID = "plugin.video.teleboy"
 
 MODE_RECORDINGS = "recordings"
 MODE_LIVE = "live"
-MODE_PLAY = "play"
-MODE_PLAY_RECORDING = "playrec"
 MODE_DELETE = "delete"
 PARAMETER_KEY_MODE = "mode"
 PARAMETER_KEY_STATION = "station"
@@ -134,11 +132,6 @@ def fetchApiJson(user_id, url, args={}):
     return simplejson.loads(ans)
 
 
-def get_videoJson(user_id, sid):
-    url = "stream/live/%s" % sid
-    return fetchApiJson(user_id, url, {"alternative": "false"})
-
-
 def show_main():
     html = fetchHttpWithCookies(TB_URL + "/live")
 
@@ -195,10 +188,12 @@ def show_live(user_id):
         li = xbmcgui.ListItem(label, iconImage=preview, thumbnailImage=preview)
         li.setArt({'thumb': preview, 'poster': img, 'fanart': img})
         li.setProperty("Video", "true")
-        params = {PARAMETER_KEY_STATION: station_id,
-                  PARAMETER_KEY_MODE: MODE_PLAY,
-                  PARAMETER_KEY_USERID: user_id}
-        url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
+        li.setProperty("IsPlayable", "true")
+
+        url = "stream/live/%s" % station_id
+        stream = fetchApiJson(user_id, url, {"alternative": "false"})
+        url = stream["data"]["stream"]["url"]
+
         xbmcplugin.addDirectoryItem(handle=pluginhandle,
                                     url=url,
                                     listitem=li)
@@ -263,6 +258,7 @@ def show_recordings(user_id):
         li = xbmcgui.ListItem(label, iconImage=preview, thumbnailImage=preview)
         li.setArt({'thumb': preview, 'poster': img, 'fanart': img})
         li.setProperty("Video", "true")
+        li.setProperty("IsPlayable", "true")
 
         # show video information
         duration = endtime - starttime
@@ -305,23 +301,15 @@ def show_recordings(user_id):
 
         li.addContextMenuItems(context_menu)
 
-        params = {PARAMETER_KEY_MODE: MODE_PLAY_RECORDING,
-                  PARAMETER_KEY_USERID: user_id,
-                  PARAMETER_KEY_RECID: recid}
-        url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
+        url = "stream/record/%s" % recid
+        json = fetchApiJson(user_id, url)
+
+        url = json["data"]["stream"]["url"]
         xbmcplugin.addDirectoryItem(handle=pluginhandle,
                                     url=url,
                                     listitem=li)
 
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
-
-
-def play_url(url, title, img=""):
-    li = xbmcgui.ListItem(title, iconImage=img, thumbnailImage=img)
-    li.setProperty("IsPlayable", "true")
-    li.setProperty("Video", "true")
-
-    xbmc.Player().play(url, li)
 
 
 def fetchHttp(url, args={}, hdrs={}, post=False):
@@ -391,27 +379,3 @@ elif mode == MODE_RECORDINGS:
 
 elif mode == MODE_LIVE:
     show_live(user_id)
-
-elif mode == MODE_PLAY:
-    station = params[PARAMETER_KEY_STATION][0]
-    json = get_videoJson(user_id, station)
-    if not json:
-        exit(1)
-
-    title = json["data"]["epg"]["current"]["title"]
-    url = json["data"]["stream"]["url"]
-
-    if not url:
-        exit(1)
-    img = get_stationLogoURL(station)
-
-    play_url(url, title, img)
-
-elif mode == MODE_PLAY_RECORDING:
-    url = "stream/record/%s" % recid
-    json = fetchApiJson(user_id, url)
-
-    title = json["data"]["record"]["title"]
-    url = json["data"]["stream"]["url"]
-
-    play_url(url, title)
