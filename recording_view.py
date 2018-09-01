@@ -23,8 +23,10 @@ RECORDINGS_BROADCASTS_FILE = xbmc.translatePath(
         "special://home/addons/" + PLUGINID + "/resources/recordings_broadcasts.dat")  # noqa: E501
 PARAMETER_KEY_DURATION = "duration"
 PARAMETER_KEY_RECID = "recid"
+PARAMETER_KEY_FOLDER = "folder"
 ACTION_PLAY_RECORDING = "playrec"
 ACTION_DELETE = "delete"
+ACTION_RECORDINGS_FOLDER = "recfolder"
 
 
 def handle_recording_view(params):
@@ -35,6 +37,8 @@ def handle_recording_view(params):
         delete_record(user_id, recid)
     elif action == ACTION_PLAY_RECORDING:
         play_recording(user_id, recid, params)
+    elif action == ACTION_RECORDINGS_FOLDER:
+        show_recordings_folder(user_id, params)
     else:
         show_recordings(user_id)
 
@@ -58,15 +62,56 @@ def show_recordings(user_id):
     if updated:
         fetch_records(user_id, content)
 
+    folders = []
+
+    for item in content["data"]["items"]:
+        title = item["title"].encode('utf8')
+        if title in folders:
+            continue
+
+        folders.append(title)
+
+        params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
+                  PARAMETER_KEY_ACTION: ACTION_RECORDINGS_FOLDER,
+                  PARAMETER_KEY_FOLDER: title,
+                  PARAMETER_KEY_USERID: user_id}
+        url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
+        li = xbmcgui.ListItem(title)
+
+        # add refresh option
+        context_menu = [('Refresh', 'Container.Refresh')]
+        li.addContextMenuItems(context_menu)
+
+        xbmcplugin.addDirectoryItem(handle=pluginhandle,
+                                    url=url,
+                                    listitem=li,
+                                    isFolder=True)
+
+    xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
+
+
+def show_recordings_folder(user_id, params):
+    folder = params.get(PARAMETER_KEY_FOLDER, "[0]")[0]
+    updated, content = check_records_updated(user_id)
+
+    with open(RECORDINGS_FILE, 'w') as f:
+        simplejson.dump(content, f)
+
+    if updated:
+        fetch_records(user_id, content)
+
     broadcasts = read_broadcasts()
 
     for item in content["data"]["items"]:
+        title = item["title"].encode('utf8')
+        if title != folder:
+            continue
         station = item['station']
 
         # set label
         starttime = parse(item["begin"])
         endtime = parse(item['end'])
-        titlestring = '[B]{}[/B]'.format(item["title"].encode('utf8'))
+        titlestring = '[B]{}[/B]'.format(title)
         if item['subtitle']:
             titlestring += ' - {}'.format(item["subtitle"].encode('utf8'))
 
