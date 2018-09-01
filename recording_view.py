@@ -7,8 +7,9 @@ import xbmc
 import xbmcgui
 import simplejson
 from dateutil.parser import parse
-from common import PARAMETER_KEY_MODE, \
+from common import PARAMETER_KEY_MODE, PARAMETER_KEY_ACTION, \
         PARAMETER_KEY_USERID, \
+        MODE_RECORDINGS, \
         PLUGINID, API_KEY, API_URL, \
         pluginhandle
 from common import cookies  # noqa: F401
@@ -22,8 +23,20 @@ RECORDINGS_BROADCASTS_FILE = xbmc.translatePath(
         "special://home/addons/" + PLUGINID + "/resources/recordings_broadcasts.dat")  # noqa: E501
 PARAMETER_KEY_DURATION = "duration"
 PARAMETER_KEY_RECID = "recid"
-MODE_PLAY_RECORDING = "playrec"
-MODE_DELETE = "delete"
+ACTION_PLAY_RECORDING = "playrec"
+ACTION_DELETE = "delete"
+
+
+def handle_recording_view(params):
+    user_id = params.get(PARAMETER_KEY_USERID, "[0]")[0]
+    action = params.get(PARAMETER_KEY_ACTION, "[0]")[0]
+    recid = params.get(PARAMETER_KEY_RECID, "[0]")[0]
+    if action == ACTION_DELETE:
+        delete_record(user_id, recid)
+    elif action == ACTION_PLAY_RECORDING:
+        play_recording(user_id, recid, params)
+    else:
+        show_recordings(user_id)
 
 
 def read_broadcasts():
@@ -129,7 +142,8 @@ def show_recordings(user_id):
         # add delete option
         script_path = xbmc.translatePath("special://home/addons/{}/teleboy.py"
                                          .format(PLUGINID))
-        params = {PARAMETER_KEY_MODE: MODE_DELETE,
+        params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
+                  PARAMETER_KEY_ACTION: ACTION_DELETE,
                   PARAMETER_KEY_USERID: user_id,
                   PARAMETER_KEY_RECID: recid}
         context_menu.append(('Delete', 'RunScript({}, {}, ?{})'
@@ -139,7 +153,8 @@ def show_recordings(user_id):
 
         li.addContextMenuItems(context_menu)
 
-        params = {PARAMETER_KEY_MODE: MODE_PLAY_RECORDING,
+        params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
+                  PARAMETER_KEY_ACTION: ACTION_PLAY_RECORDING,
                   PARAMETER_KEY_USERID: user_id,
                   PARAMETER_KEY_RECID: recid,
                   PARAMETER_KEY_DURATION: duration.total_seconds()}
@@ -185,8 +200,7 @@ def check_records_updated(user_id):
     return False, content
 
 
-def play_recording(user_id, params):
-    recid = params.get(PARAMETER_KEY_RECID, "[0]")[0]
+def play_recording(user_id, recid, params):
     duration = float(params[PARAMETER_KEY_DURATION][0])
     url = "stream/record/%s" % recid
     json = fetchApiJson(user_id, url)
@@ -203,8 +217,7 @@ def play_recording(user_id, params):
     play_url(url, title, start_percent=start_percent)
 
 
-def delete_record(user_id, params):
-    recid = params.get(PARAMETER_KEY_RECID, "[0]")[0]
+def delete_record(user_id, recid):
     # get session key from cookie
     global cookies
     xbmc.log("[delete {} {}]".format(user_id, recid), level=xbmc.LOGNOTICE)

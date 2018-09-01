@@ -3,13 +3,23 @@ import urllib
 import xbmcgui
 import xbmcplugin
 from fetch_helpers import fetchApiJson, get_stationLogoURL, get_videoJson
-from common import PARAMETER_KEY_MODE, PARAMETER_KEY_USERID
+from common import PARAMETER_KEY_MODE, PARAMETER_KEY_ACTION, \
+        PARAMETER_KEY_USERID, MODE_LIVE
 from common import pluginhandle, settings
 from play import play_url, THUMBNAIL_URL
 
 
 PARAMETER_KEY_STATION = "station"
-MODE_PLAY = "play"
+ACTION_PLAY = "play"
+
+
+def handle_live_view(params):
+    action = params.get(PARAMETER_KEY_ACTION, "[0]")[0]
+    user_id = params.get(PARAMETER_KEY_USERID, "[0]")[0]
+    if action == ACTION_PLAY:
+        play_live(user_id, params)
+    else:
+        show_live(user_id)
 
 
 def show_live(user_id):
@@ -33,7 +43,8 @@ def show_live(user_id):
         li.setArt({'thumb': preview, 'poster': img, 'fanart': img})
         li.setProperty("Video", "true")
         params = {PARAMETER_KEY_STATION: station_id,
-                  PARAMETER_KEY_MODE: MODE_PLAY,
+                  PARAMETER_KEY_MODE: MODE_LIVE,
+                  PARAMETER_KEY_ACTION: ACTION_PLAY,
                   PARAMETER_KEY_USERID: user_id}
         url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
         xbmcplugin.addDirectoryItem(handle=pluginhandle,

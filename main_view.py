@@ -9,6 +9,10 @@ from common import PARAMETER_KEY_MODE, PARAMETER_KEY_USERID, \
 from common import pluginhandle
 
 
+def handle_main_view(params):
+    show_main()
+
+
 def show_main():
     html = fetchHttpWithCookies(TB_URL + "/live")
 
