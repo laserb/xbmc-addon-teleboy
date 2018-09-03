@@ -1,26 +1,18 @@
 import sys
-import os
 import urllib
-import urllib2
 import xbmcplugin
 import xbmc
 import xbmcgui
-import simplejson
 from dateutil.parser import parse
 from common import PARAMETER_KEY_MODE, PARAMETER_KEY_ACTION, \
         PARAMETER_KEY_USERID, \
         MODE_RECORDINGS, \
-        PLUGINID, API_KEY, API_URL, \
+        PLUGINID, \
         pluginhandle
-from common import cookies  # noqa: F401
-from fetch_helpers import fetchApiJson
+from fetch_helpers import get_records, delete_record, get_play_data
 from play import play_url, THUMBNAIL_URL
 
 
-RECORDINGS_FILE = xbmc.translatePath(
-    "special://home/addons/" + PLUGINID + "/resources/recordings.dat")
-RECORDINGS_BROADCASTS_FILE = xbmc.translatePath(
-        "special://home/addons/" + PLUGINID + "/resources/recordings_broadcasts.dat")  # noqa: E501
 PARAMETER_KEY_DURATION = "duration"
 PARAMETER_KEY_RECID = "recid"
 PARAMETER_KEY_FOLDER = "folder"
@@ -34,7 +26,7 @@ def handle_recording_view(params):
     action = params.get(PARAMETER_KEY_ACTION, "[0]")[0]
     recid = params.get(PARAMETER_KEY_RECID, "[0]")[0]
     if action == ACTION_DELETE:
-        delete_record(user_id, recid)
+        delete(user_id, recid)
     elif action == ACTION_PLAY_RECORDING:
         play_recording(user_id, recid, params)
     elif action == ACTION_RECORDINGS_FOLDER:
@@ -43,24 +35,8 @@ def handle_recording_view(params):
         show_recordings(user_id)
 
 
-def read_broadcasts():
-    broadcasts = {}
-    if os.path.exists(RECORDINGS_BROADCASTS_FILE):
-        with open(RECORDINGS_BROADCASTS_FILE, 'r') as f:
-            s = f.read()
-            if s:
-                broadcasts = simplejson.loads(s)
-    return broadcasts
-
-
 def show_recordings(user_id):
-    updated, content = check_records_updated(user_id)
-
-    with open(RECORDINGS_FILE, 'w') as f:
-        simplejson.dump(content, f)
-
-    if updated:
-        fetch_records(user_id, content)
+    broadcasts, content = get_records(user_id)
 
     folders = []
 
@@ -92,15 +68,8 @@ def show_recordings(user_id):
 
 def show_recordings_folder(user_id, params):
     folder = params.get(PARAMETER_KEY_FOLDER, "[0]")[0]
-    updated, content = check_records_updated(user_id)
 
-    with open(RECORDINGS_FILE, 'w') as f:
-        simplejson.dump(content, f)
-
-    if updated:
-        fetch_records(user_id, content)
-
-    broadcasts = read_broadcasts()
+    broadcasts, content = get_records(user_id)
 
     for item in content["data"]["items"]:
         title = item["title"].encode('utf8')
@@ -211,79 +180,24 @@ def show_recordings_folder(user_id, params):
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
-def fetch_records(user_id, content):
-    old_broadcasts = read_broadcasts()
-    broadcasts = {}
-    for item in content["data"]["items"]:
-        broadcast_id = str(item["broadcast_id"])
-        if broadcast_id in old_broadcasts:
-            broadcast = old_broadcasts[broadcast_id]
-        else:
-            broadcast = fetchApiJson(user_id,
-                                     "broadcasts/{}".format(broadcast_id),
-                                     {"expand": "previewImage"})
-        broadcasts[broadcast_id] = broadcast
-    with open(RECORDINGS_BROADCASTS_FILE, 'w') as f:
-        simplejson.dump(broadcasts, f)
-
-
-def check_records_updated(user_id):
-    recordings = None
-    if os.path.exists(RECORDINGS_FILE):
-        with open(RECORDINGS_FILE, 'r') as f:
-            s = f.read()
-            if s:
-                recordings = simplejson.loads(s)
-    content = fetchApiJson(user_id, "records/ready",
-                           {"expand": "station",
-                            "limit": 500,
-                            "skip": 0})
-
-    if content != recordings:
-        xbmc.log("updated", level=xbmc.LOGDEBUG)
-        return True, content
-    return False, content
-
-
 def play_recording(user_id, recid, params):
     duration = float(params[PARAMETER_KEY_DURATION][0])
-    url = "stream/record/%s" % recid
-    json = fetchApiJson(user_id, url)
+
+    json = get_play_data(user_id, recid)
 
     title = json["data"]["record"]["title"]
     url = json["data"]["stream"]["url"]
 
-    # set stream start to where the actual record starts
     start_offset = float(json["data"]["stream"]["offset_before"])
     end_offset = float(json["data"]["stream"]["offset_after"])
+
+    # set stream start to where the actual record starts
     stream_duration = start_offset + duration + end_offset
     start_percent = 100.0*start_offset/stream_duration
 
     play_url(url, title, start_percent=start_percent)
 
 
-def delete_record(user_id, recid):
-    # get session key from cookie
-    global cookies
-    xbmc.log("[delete {} {}]".format(user_id, recid), level=xbmc.LOGNOTICE)
-    cookies.revert(ignore_discard=True)
-    session_cookie = ""
-    for c in cookies:
-        if c.name == "cinergy_s":
-            session_cookie = c.value
-            break
-
-    if (session_cookie == ""):
-        xbmc.executebuiltin("XBMC.Notification({},{})".format(
-                "Session cookie not found!",
-                "Please set your login/password in the addon settings"))
-        return False
-
-    hdrs = {"x-teleboy-apikey": API_KEY,
-            "x-teleboy-session": session_cookie}
-    url = API_URL + "/users/%s/records/%s" % (user_id, recid)
-    hdrs["User-Agent"] = "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/20100101 Firefox/5.0"  # noqa: E501
-    req = urllib2.Request(url, None, hdrs)
-    req.get_method = lambda: 'DELETE'
-    urllib2.urlopen(req)
+def delete(user_id, recid):
+    delete_record(user_id, recid)
     xbmc.executebuiltin("Container.Refresh")
