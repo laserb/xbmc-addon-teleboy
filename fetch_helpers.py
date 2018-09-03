@@ -6,6 +6,7 @@ import urllib2
 import urllib
 import xbmcplugin
 import base64
+import requests
 from common import PLUGINID
 from common import settings, pluginhandle
 
@@ -27,25 +28,11 @@ RECORDINGS_BROADCASTS_FILE = xbmc.translatePath(
 
 
 cookies = cookielib.LWPCookieJar(COOKIE_FILE)
+opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookies))
+urllib2.install_opener(opener)
 
 
-def ensure_login():
-    global cookies
-    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookies))
-    urllib2.install_opener(opener)
-    try:
-        cookies.revert(ignore_discard=True)
-        found_cookie = False
-        for c in cookies:
-            if c.name == "cinergy_auth" and not c.is_expired():
-                found_cookie = True
-                break
-        if found_cookie:
-            for c in cookies:
-                if c.name == "cinergy_s" and not c.is_expired():
-                    return True
-    except IOError:
-        pass
+def login():
     cookies.clear()
     fetchHttp(TB_URL + "/login")
 
@@ -58,10 +45,11 @@ def ensure_login():
             "keep_login": "1"}
     hdrs = {"Referer": TB_URL}
 
-    reply = fetchHttp(url, args, hdrs, post=True)
+    reply = fetchHttp(url, args, hdrs, method="POST")
 
     if "Falsche Eingaben" in reply \
-            or "Anmeldung war nicht erfolgreich" in reply:
+            or "Anmeldung war nicht erfolgreich" in reply \
+            or "Bitte melde dich neu an" in reply:
         xbmc.log("login failure", level=xbmc.LOGNOTICE)
         xbmc.log(reply, level=xbmc.LOGNOTICE)
         xbmc.executebuiltin("XBMC.Notification({},{})".format(
@@ -75,14 +63,35 @@ def ensure_login():
     return True
 
 
-def fetchHttp(url, args={}, hdrs={}, post=False):
-    xbmc.log("fetchHttp(%s): %s" % ("POST" if post else "GET", url),
+def ensure_login():
+    global cookies
+    cookies.revert(ignore_discard=True)
+    cookies_dict = requests.utils.dict_from_cookiejar(cookies)
+    if "cinergy_auth" in cookies_dict and "cinergy_s" in cookies_dict:
+        xbmc.log("Already logged in", level=xbmc.LOGNOTICE)
+        return True
+    else:
+        return login()
+
+
+def get_session_cookie():
+    global cookies
+    ensure_login()
+    cookies_dict = requests.utils.dict_from_cookiejar(cookies)
+    return cookies_dict["cinergy_s"]
+
+
+def fetchHttp(url, args={}, hdrs={}, method="GET"):
+    xbmc.log("fetchHttp(%s): %s" % (method, url),
              level=xbmc.LOGNOTICE)
     if args:
         xbmc.log("args-keys: %s" % args.keys(), level=xbmc.LOGNOTICE)
     hdrs["User-Agent"] = "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/20100101 Firefox/5.0"  # noqa: E501
-    if post:
+    if method == "POST":
         req = urllib2.Request(url, urllib.urlencode(args), hdrs)
+    elif method == "DELETE":
+        req = urllib2.Request(url, None, hdrs)
+        req.get_method = lambda: 'DELETE'
     else:
         url = url + "?" + urllib.urlencode(args)
         req = urllib2.Request(url, None, hdrs)
@@ -94,38 +103,17 @@ def fetchHttp(url, args={}, hdrs={}, post=False):
     return responsetext
 
 
-def fetchHttpWithCookies(url, args={}, hdrs={}, post=False):
-    if ensure_login():
-        html = fetchHttp(url, args, hdrs, post)
-        if "Bitte melde dich neu an" in html:
-            os.unlink(xbmc.translatePath(COOKIE_FILE))
-            if not ensure_login():
-                return ""
-            html = fetchHttp(url, args, hdrs, post)
-        return html
-    return ""
+def fetchHttpWithCookies(url, args={}, hdrs={}, method="GET"):
+    session_cookie = get_session_cookie()
+
+    hdrs["x-teleboy-apikey"] = API_KEY
+    hdrs["x-teleboy-session"] = session_cookie
+    return fetchHttp(url, args, hdrs, method)
 
 
 def fetchApiJson(user_id, url, args={}):
-    # get session key from cookie
-    global cookies
-    cookies.revert(ignore_discard=True)
-    session_cookie = ""
-    for c in cookies:
-        if c.name == "cinergy_s":
-            session_cookie = c.value
-            break
-
-    if (session_cookie == ""):
-        xbmc.executebuiltin("XBMC.Notification({},{})".format(
-                "Session cookie not found!",
-                "Please set your login/password in the addon settings"))
-        return False
-
-    hdrs = {"x-teleboy-apikey": API_KEY,
-            "x-teleboy-session": session_cookie}
     url = API_URL + "/users/%s/" % user_id + url
-    ans = fetchHttpWithCookies(url, args, hdrs)
+    ans = fetchHttpWithCookies(url, args)
     return simplejson.loads(ans)
 
 
@@ -171,6 +159,7 @@ def check_records_updated(user_id):
             s = f.read()
             if s:
                 recordings = simplejson.loads(s)
+
     content = fetchApiJson(user_id, "records/ready",
                            {"expand": "station",
                             "limit": 500,
@@ -202,26 +191,5 @@ def fetch_records(user_id, content):
 
 
 def delete_record(user_id, recid):
-    # get session key from cookie
-    global cookies
-    xbmc.log("[delete {} {}]".format(user_id, recid), level=xbmc.LOGNOTICE)
-    cookies.revert(ignore_discard=True)
-    session_cookie = ""
-    for c in cookies:
-        if c.name == "cinergy_s":
-            session_cookie = c.value
-            break
-
-    if (session_cookie == ""):
-        xbmc.executebuiltin("XBMC.Notification({},{})".format(
-                "Session cookie not found!",
-                "Please set your login/password in the addon settings"))
-        return False
-
-    hdrs = {"x-teleboy-apikey": API_KEY,
-            "x-teleboy-session": session_cookie}
     url = API_URL + "/users/%s/records/%s" % (user_id, recid)
-    hdrs["User-Agent"] = "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/20100101 Firefox/5.0"  # noqa: E501
-    req = urllib2.Request(url, None, hdrs)
-    req.get_method = lambda: 'DELETE'
-    urllib2.urlopen(req)
+    fetchHttpWithCookies(url, args={}, hdrs={}, method="DELETE")
