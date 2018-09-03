@@ -1,9 +1,8 @@
-import xbmc
 import xbmcgui
 import xbmcplugin
 import sys
 import urllib
-from fetch_helpers import fetchHttpWithCookies, TB_URL
+from fetch_helpers import get_user_id
 from common import PARAMETER_KEY_MODE, PARAMETER_KEY_USERID, \
         MODE_LIVE, MODE_RECORDINGS
 from common import pluginhandle
@@ -14,17 +13,7 @@ def handle_main_view(params):
 
 
 def show_main():
-    html = fetchHttpWithCookies(TB_URL + "/live")
-
-    # extract user id
-    user_id = ""
-    lines = html.split('\n')
-    for line in lines:
-        if "setId" in line:
-            dummy, uid = line.split("(")
-            user_id = uid[:-1]
-            xbmc.log("user id: " + user_id, level=xbmc.LOGNOTICE)
-            break
+    user_id = get_user_id()
 
     # add recordings directory
     params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,

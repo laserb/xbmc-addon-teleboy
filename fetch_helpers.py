@@ -32,6 +32,21 @@ opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookies))
 urllib2.install_opener(opener)
 
 
+def get_user_id():
+    html = fetchHttpWithCookies(TB_URL + "/live")
+
+    # extract user id
+    user_id = ""
+    lines = html.split('\n')
+    for line in lines:
+        if "setId" in line:
+            dummy, uid = line.split("(")
+            user_id = uid[:-1]
+            break
+    xbmc.log("user id: " + user_id, level=xbmc.LOGNOTICE)
+    return user_id
+
+
 def login():
     cookies.clear()
     fetchHttp(TB_URL + "/login")
