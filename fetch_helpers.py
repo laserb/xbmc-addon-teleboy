@@ -126,9 +126,9 @@ def fetchHttpWithCookies(url, args={}, hdrs={}, method="GET"):
     return fetchHttp(url, args, hdrs, method)
 
 
-def fetchApiJson(user_id, url, args={}):
+def fetchApiJson(user_id, url, args={}, method="GET"):
     url = API_URL + "/users/%s/" % user_id + url
-    ans = fetchHttpWithCookies(url, args)
+    ans = fetchHttpWithCookies(url, args, method)
     return simplejson.loads(ans)
 
 
@@ -206,5 +206,5 @@ def fetch_records(user_id, content):
 
 
 def delete_record(user_id, recid):
-    url = API_URL + "/users/%s/records/%s" % (user_id, recid)
-    fetchHttpWithCookies(url, args={}, hdrs={}, method="DELETE")
+    url = "records/%s" % recid
+    fetchApiJson(user_id, url, method="DELETE")
