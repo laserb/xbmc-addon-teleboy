@@ -11,7 +11,7 @@ from common import PLUGINID
 from common import settings, pluginhandle
 
 
-API_URL = "http://tv.api.teleboy.ch"
+API_URL = "https://tv.api.teleboy.ch"
 API_KEY = base64.b64decode(
         "ZjBlN2JkZmI4MjJmYTg4YzBjN2ExM2Y3NTJhN2U4ZDVjMzc1N2ExM2Y3NTdhMTNmOWMwYzdhMTNmN2RmYjgyMg==")  # noqa: E501
 
