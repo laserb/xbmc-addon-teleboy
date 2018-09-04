@@ -2,7 +2,7 @@ import sys
 import urllib
 import xbmcgui
 import xbmcplugin
-from fetch_helpers import fetchApiJson, get_stationLogoURL, get_videoJson
+from fetch_helpers import fetchApiJson
 from common import PARAMETER_KEY_MODE, PARAMETER_KEY_ACTION, MODE_LIVE
 from common import pluginhandle, settings
 from play import play_url, THUMBNAIL_URL
@@ -10,6 +10,8 @@ from play import play_url, THUMBNAIL_URL
 
 PARAMETER_KEY_STATION = "station"
 ACTION_PLAY = "play"
+
+IMG_URL = "http://media.cinergy.ch"
 
 
 def handle_live_view(params):
@@ -48,6 +50,15 @@ def show_live():
                                     url=url,
                                     listitem=li)
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
+
+
+def get_stationLogoURL(station):
+    return IMG_URL + "/t_station/" + station + "/icon320_dark.png"
+
+
+def get_videoJson(sid):
+    url = "stream/live/%s" % sid
+    return fetchApiJson(url, {"alternative": "false"})
 
 
 def play_live(params):

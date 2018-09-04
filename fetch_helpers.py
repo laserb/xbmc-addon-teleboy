@@ -22,13 +22,7 @@ USERID_FILE = RESOURCES_PATH + "userid.dat"
 if not os.path.exists(RESOURCES_PATH):
     os.mkdir(RESOURCES_PATH)
 
-IMG_URL = "http://media.cinergy.ch"
 TB_URL = "https://www.teleboy.ch"
-
-RECORDINGS_FILE = xbmc.translatePath(
-    "special://home/addons/" + PLUGINID + "/resources/recordings.dat")
-RECORDINGS_BROADCASTS_FILE = xbmc.translatePath(
-        "special://home/addons/" + PLUGINID + "/resources/recordings_broadcasts.dat")  # noqa: E501
 
 
 cookies = cookielib.LWPCookieJar(COOKIE_FILE)
@@ -145,80 +139,3 @@ def fetchApiJson(url, args={}, method="GET"):
     url = API_URL + "/users/%s/" % user_id + url
     ans = fetchHttpWithCookies(url, args, method=method)
     return simplejson.loads(ans)
-
-
-def get_stationLogoURL(station):
-    return IMG_URL + "/t_station/" + station + "/icon320_dark.png"
-
-
-def get_videoJson(sid):
-    url = "stream/live/%s" % sid
-    return fetchApiJson(url, {"alternative": "false"})
-
-
-def get_play_data(recid):
-    url = "stream/record/%s" % recid
-    return fetchApiJson(url)
-
-
-def get_records():
-    updated, content = check_records_updated()
-
-    if updated:
-        broadcasts = fetch_records(content)
-    else:
-        broadcasts = read_broadcasts()
-
-    return broadcasts, content
-
-
-def read_broadcasts():
-    broadcasts = {}
-    if os.path.exists(RECORDINGS_BROADCASTS_FILE):
-        with open(RECORDINGS_BROADCASTS_FILE, 'r') as f:
-            s = f.read()
-            if s:
-                broadcasts = simplejson.loads(s)
-    return broadcasts
-
-
-def check_records_updated():
-    recordings = None
-    if os.path.exists(RECORDINGS_FILE):
-        with open(RECORDINGS_FILE, 'r') as f:
-            s = f.read()
-            if s:
-                recordings = simplejson.loads(s)
-
-    content = fetchApiJson("records/ready",
-                           {"expand": "station",
-                            "limit": 500,
-                            "skip": 0})
-
-    if content != recordings:
-        xbmc.log("updated", level=xbmc.LOGDEBUG)
-        with open(RECORDINGS_FILE, 'w') as f:
-            simplejson.dump(content, f)
-        return True, content
-    return False, content
-
-
-def fetch_records(content):
-    old_broadcasts = read_broadcasts()
-    broadcasts = {}
-    for item in content["data"]["items"]:
-        broadcast_id = str(item["broadcast_id"])
-        if broadcast_id in old_broadcasts:
-            broadcast = old_broadcasts[broadcast_id]
-        else:
-            broadcast = fetchApiJson("broadcasts/{}".format(broadcast_id),
-                                     {"expand": "previewImage"})
-        broadcasts[broadcast_id] = broadcast
-    with open(RECORDINGS_BROADCASTS_FILE, 'w') as f:
-        simplejson.dump(broadcasts, f)
-    return broadcasts
-
-
-def delete_record(recid):
-    url = "records/%s" % recid
-    fetchApiJson(url, method="DELETE")
