@@ -35,18 +35,36 @@ def handle_recording_view(params):
         show_recordings(user_id)
 
 
+def add_refresh_option(context_menu):
+    # add refresh option
+    context_menu.append(('Refresh', 'Container.Refresh'))
+    return context_menu
+
+
+def add_delete_option(user_id, recid, context_menu):
+    # add delete option
+    script_path = xbmc.translatePath("special://home/addons/{}/teleboy.py"
+                                     .format(PLUGINID))
+    params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
+              PARAMETER_KEY_ACTION: ACTION_DELETE,
+              PARAMETER_KEY_USERID: user_id,
+              PARAMETER_KEY_RECID: recid}
+    context_menu.append(('Delete', 'RunScript({}, {}, ?{})'
+                         .format(script_path,
+                                 pluginhandle,
+                                 urllib.urlencode(params))))
+    return context_menu
+
+
 def show_recordings(user_id):
     broadcasts, content = get_records(user_id)
 
-    folders = []
+    titles = [item["title"] for item in content["data"]["items"]]
+    # create unique list of titles
+    titles = sorted(list(set(titles)))
+    titles = [title.encode("utf8") for title in titles]
 
-    for item in content["data"]["items"]:
-        title = item["title"].encode('utf8')
-        if title in folders:
-            continue
-
-        folders.append(title)
-
+    for title in titles:
         params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
                   PARAMETER_KEY_ACTION: ACTION_RECORDINGS_FOLDER,
                   PARAMETER_KEY_FOLDER: title,
@@ -54,8 +72,7 @@ def show_recordings(user_id):
         url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
         li = xbmcgui.ListItem(title)
 
-        # add refresh option
-        context_menu = [('Refresh', 'Container.Refresh')]
+        context_menu = add_refresh_option([])
         li.addContextMenuItems(context_menu)
 
         xbmcplugin.addDirectoryItem(handle=pluginhandle,
@@ -66,112 +83,100 @@ def show_recordings(user_id):
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
+def get_image(broadcasts, broadcast_id):
+    def get_image_url(image):
+        if not image:
+            return ""
+        return THUMBNAIL_URL.format(image)
+
+    broadcast = broadcasts[broadcast_id]["data"]
+
+    teleboy_images = broadcast.get("teleboy_images", [])
+    images = teleboy_images or broadcast.get("images", []) or [{}]
+
+    image = get_image_url(images[0].get("hash"))
+
+    preview = get_image_url(broadcast.get("preview_image", {}).get("hash"))
+    primary_image = broadcast.get("primary_image", {}).get("hash")
+    primary_image = get_image_url(primary_image)
+
+    preview = preview or image or primary_image or "DefaultVideo.png"
+    image = image or preview or primary_image or "DefaultVideo.png"
+    return preview, image
+
+
 def show_recordings_folder(user_id, params):
     folder = params.get(PARAMETER_KEY_FOLDER, "[0]")[0]
 
     broadcasts, content = get_records(user_id)
+    items = content["data"]["items"]
 
-    for item in content["data"]["items"]:
-        title = item["title"].encode('utf8')
-        if title != folder:
-            continue
-        station = item['station']
+    # filter items for current folder
+    items = [item for item in items if item["title"].encode("utf8") == folder]
 
-        # set label
+    for item in items:
+        # get ids
+        recid = str(item["id"])
+        broadcast_id = str(item["broadcast_id"])
+
+        # get title
+        title = item["title"].encode("utf8")
+        subtitle = item.get("subtitle", "").encode("utf8")
+
+        station = item["station"]["name"]
+
+        # get times
         starttime = parse(item["begin"])
         endtime = parse(item['end'])
+        duration = (endtime - starttime).total_seconds()
+
+        # get cast
+        cast = item.get('cast', '').split(',')
+        cast += item.get('anchor', '').split(',')
+
+        # set label
         titlestring = '[B]{}[/B]'.format(title)
-        if item['subtitle']:
-            titlestring += ' - {}'.format(item["subtitle"].encode('utf8'))
+        if subtitle:
+            titlestring += ' - {}'.format(subtitle)
 
         datestring = starttime.strftime("%d.%m.%y %H:%M")
         label = "{}[CR][COLOR darkgray]{} {}[/COLOR]".format(titlestring,
                                                              datestring,
-                                                             station['name'])
-        recid = str(item["id"])
+                                                             station)
 
         # set image
-        broadcast = broadcasts[str(item["broadcast_id"])]
-        broadcast = broadcast["data"]
+        preview, image = get_image(broadcasts, broadcast_id)
 
-        images = broadcast.get("teleboy_images", [])
-        img = ""
-        if not images:
-            images = broadcast.get("images", [])
-        if images:
-            img = THUMBNAIL_URL.format(images[0]["hash"])
-
-        preview = ""
-        if "preview_image" in broadcast:
-            preview = THUMBNAIL_URL.format(broadcast["preview_image"]["hash"])
-
-        primary_image = ""
-        if "primary_image" in broadcast:
-            primary_image = THUMBNAIL_URL \
-                    .format(broadcast["primary_image"]["hash"])
-
-        if not img and not preview and not primary_image:
-            img = "DefaultVideo.png"
-            preview = img
-        elif not img and not preview and primary_image:
-            img = primary_image
-            preview = primary_image
-        elif not img and preview:
-            img = preview
-        elif img and not preview:
-            preview = img
+        # video info
+        info = {
+            'title': title,
+            'plot': item['info_5'],
+            'plotoutline': item['info'],
+            'duration': duration,
+            'studio': station,
+            'genre': item['genre'],
+            'director': item.get('director', ''),
+            'episode': item.get('episode', ''),
+            'cast': cast
+        }
 
         li = xbmcgui.ListItem(label, iconImage=preview, thumbnailImage=preview)
-        li.setArt({'thumb': preview, 'poster': img, 'fanart': img})
+        li.setArt({'thumb': preview, 'poster': image, 'fanart': image})
         li.setProperty("Video", "true")
 
         # show video information
-        duration = endtime - starttime
-        info = {
-            'title': item['title'],
-            'plot': item['info_5'],
-            'plotoutline': item['info'],
-            'duration': duration.total_seconds(),
-            'studio': station['name'],
-            'genre': item['genre'],
-            'director': item.get('director'),
-        }
-        episode = item.get('episode', '')
-        if episode:
-            info['episode'] = episode
-        cast = item.get('cast', '')
-        anchor = item.get('anchor', '')
-        if anchor:
-            if cast:
-                cast += ',%s' % anchor
-            else:
-                cast = anchor
-        if cast:
-            info['cast'] = cast.split(',')
         li.setInfo('video', info)
 
         # add refresh option
-        context_menu = [('Refresh', 'Container.Refresh')]
-
-        # add delete option
-        script_path = xbmc.translatePath("special://home/addons/{}/teleboy.py"
-                                         .format(PLUGINID))
-        params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
-                  PARAMETER_KEY_ACTION: ACTION_DELETE,
-                  PARAMETER_KEY_USERID: user_id,
-                  PARAMETER_KEY_RECID: recid}
-        context_menu.append(('Delete', 'RunScript({}, {}, ?{})'
-                             .format(script_path,
-                                     pluginhandle,
-                                     urllib.urlencode(params))))
-
+        context_menu = add_refresh_option([])
+        context_menu = add_delete_option(user_id, recid, context_menu)
         li.addContextMenuItems(context_menu)
 
         params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
                   PARAMETER_KEY_ACTION: ACTION_PLAY_RECORDING,
                   PARAMETER_KEY_USERID: user_id,
                   PARAMETER_KEY_RECID: recid,
-                  PARAMETER_KEY_DURATION: duration.total_seconds()}
+                  PARAMETER_KEY_DURATION: duration}
         url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
         xbmcplugin.addDirectoryItem(handle=pluginhandle,
                                     url=url,

@@ -34,13 +34,14 @@ class TestRecordingView(unittest.TestCase):
 
         call_add_refresh = call().addContextMenuItems([('Refresh',
                                                         'Container.Refresh')])
-        calls = [call('Hot oder Schrott - Die Allestester'),
+        calls = [call('Genial daneben'),
                  call_add_refresh,
-                 call('Genial daneben'),
+                 call('Genial daneben - Das Quiz'),
                  call_add_refresh,
-                 call('A2 - Abenteuer Autobahn'),
+                 call('Hot oder Schrott - Die Allestester'),
                  call_add_refresh,
-                 call('Wir sind Kaiser')]
+                 call('Markus Krebs - Witzearena'),
+                 call_add_refresh]
 
         xbmcgui.ListItem.assert_has_calls(calls)
         xbmcplugin.addDirectoryItem.assert_called()
