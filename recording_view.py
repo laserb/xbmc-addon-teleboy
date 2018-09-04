@@ -5,7 +5,6 @@ import xbmc
 import xbmcgui
 from dateutil.parser import parse
 from common import PARAMETER_KEY_MODE, PARAMETER_KEY_ACTION, \
-        PARAMETER_KEY_USERID, \
         MODE_RECORDINGS, \
         PLUGINID, \
         pluginhandle
@@ -22,17 +21,16 @@ ACTION_RECORDINGS_FOLDER = "recfolder"
 
 
 def handle_recording_view(params):
-    user_id = params.get(PARAMETER_KEY_USERID, "[0]")[0]
     action = params.get(PARAMETER_KEY_ACTION, "[0]")[0]
     recid = params.get(PARAMETER_KEY_RECID, "[0]")[0]
     if action == ACTION_DELETE:
-        delete(user_id, recid)
+        delete(recid)
     elif action == ACTION_PLAY_RECORDING:
-        play_recording(user_id, recid, params)
+        play_recording(recid, params)
     elif action == ACTION_RECORDINGS_FOLDER:
-        show_recordings_folder(user_id, params)
+        show_recordings_folder(params)
     else:
-        show_recordings(user_id)
+        show_recordings()
 
 
 def add_refresh_option(context_menu):
@@ -41,13 +39,12 @@ def add_refresh_option(context_menu):
     return context_menu
 
 
-def add_delete_option(user_id, recid, context_menu):
+def add_delete_option(recid, context_menu):
     # add delete option
     script_path = xbmc.translatePath("special://home/addons/{}/teleboy.py"
                                      .format(PLUGINID))
     params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
               PARAMETER_KEY_ACTION: ACTION_DELETE,
-              PARAMETER_KEY_USERID: user_id,
               PARAMETER_KEY_RECID: recid}
     context_menu.append(('Delete', 'RunScript({}, {}, ?{})'
                          .format(script_path,
@@ -56,8 +53,8 @@ def add_delete_option(user_id, recid, context_menu):
     return context_menu
 
 
-def show_recordings(user_id):
-    broadcasts, content = get_records(user_id)
+def show_recordings():
+    broadcasts, content = get_records()
 
     titles = [item["title"] for item in content["data"]["items"]]
     # create unique list of titles
@@ -67,8 +64,7 @@ def show_recordings(user_id):
     for title in titles:
         params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
                   PARAMETER_KEY_ACTION: ACTION_RECORDINGS_FOLDER,
-                  PARAMETER_KEY_FOLDER: title,
-                  PARAMETER_KEY_USERID: user_id}
+                  PARAMETER_KEY_FOLDER: title}
         url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
         li = xbmcgui.ListItem(title)
 
@@ -105,10 +101,10 @@ def get_image(broadcasts, broadcast_id):
     return preview, image
 
 
-def show_recordings_folder(user_id, params):
+def show_recordings_folder(params):
     folder = params.get(PARAMETER_KEY_FOLDER, "[0]")[0]
 
-    broadcasts, content = get_records(user_id)
+    broadcasts, content = get_records()
     items = content["data"]["items"]
 
     # filter items for current folder
@@ -169,12 +165,11 @@ def show_recordings_folder(user_id, params):
 
         # add refresh option
         context_menu = add_refresh_option([])
-        context_menu = add_delete_option(user_id, recid, context_menu)
+        context_menu = add_delete_option(recid, context_menu)
         li.addContextMenuItems(context_menu)
 
         params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
                   PARAMETER_KEY_ACTION: ACTION_PLAY_RECORDING,
-                  PARAMETER_KEY_USERID: user_id,
                   PARAMETER_KEY_RECID: recid,
                   PARAMETER_KEY_DURATION: duration}
         url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
@@ -185,10 +180,10 @@ def show_recordings_folder(user_id, params):
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
-def play_recording(user_id, recid, params):
+def play_recording(recid, params):
     duration = float(params[PARAMETER_KEY_DURATION][0])
 
-    json = get_play_data(user_id, recid)
+    json = get_play_data(recid)
 
     title = json["data"]["record"]["title"]
     url = json["data"]["stream"]["url"]
@@ -203,6 +198,6 @@ def play_recording(user_id, recid, params):
     play_url(url, title, start_percent=start_percent)
 
 
-def delete(user_id, recid):
-    delete_record(user_id, recid)
+def delete(recid):
+    delete_record(recid)
     xbmc.executebuiltin("Container.Refresh")

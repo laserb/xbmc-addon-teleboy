@@ -15,8 +15,12 @@ API_URL = "http://tv.api.teleboy.ch"
 API_KEY = base64.b64decode(
         "ZjBlN2JkZmI4MjJmYTg4YzBjN2ExM2Y3NTJhN2U4ZDVjMzc1N2ExM2Y3NTdhMTNmOWMwYzdhMTNmN2RmYjgyMg==")  # noqa: E501
 
-COOKIE_FILE = xbmc.translatePath(
-    "special://home/addons/" + PLUGINID + "/resources/cookie.dat")
+RESOURCES_PATH = xbmc.translatePath("special://home/addons" + PLUGINID + "/resources/")
+COOKIE_FILE = RESOURCES_PATH + "cookie.dat"
+USERID_FILE = RESOURCES_PATH + "userid.dat"
+
+if not os.path.exists(RESOURCES_PATH):
+    os.mkdir(RESOURCES_PATH)
 
 IMG_URL = "http://media.cinergy.ch"
 TB_URL = "https://www.teleboy.ch"
@@ -44,6 +48,10 @@ def get_user_id():
             user_id = uid[:-1]
             break
     xbmc.log("user id: " + user_id, level=xbmc.LOGNOTICE)
+
+    with open(USERID_FILE, "w") as f:
+        f.write(user_id)
+
     return user_id
 
 
@@ -80,7 +88,8 @@ def login():
 
 def ensure_login():
     global cookies
-    cookies.revert(ignore_discard=True)
+    if not os.path.exists(COOKIE_FILE):
+        return login()
     cookies_dict = requests.utils.dict_from_cookiejar(cookies)
     if "cinergy_auth" in cookies_dict and "cinergy_s" in cookies_dict:
         xbmc.log("Already logged in", level=xbmc.LOGNOTICE)
@@ -126,9 +135,15 @@ def fetchHttpWithCookies(url, args={}, hdrs={}, method="GET"):
     return fetchHttp(url, args, hdrs, method)
 
 
-def fetchApiJson(user_id, url, args={}, method="GET"):
+def fetchApiJson(url, args={}, method="GET"):
+    user_id = None
+    if os.path.exists(USERID_FILE):
+        with open(USERID_FILE, "r") as f:
+            user_id = f.read().strip()
+    if not user_id:
+        user_id = get_user_id()
     url = API_URL + "/users/%s/" % user_id + url
-    ans = fetchHttpWithCookies(url, args, method)
+    ans = fetchHttpWithCookies(url, args, method=method)
     return simplejson.loads(ans)
 
 
@@ -136,21 +151,21 @@ def get_stationLogoURL(station):
     return IMG_URL + "/t_station/" + station + "/icon320_dark.png"
 
 
-def get_videoJson(user_id, sid):
+def get_videoJson(sid):
     url = "stream/live/%s" % sid
-    return fetchApiJson(user_id, url, {"alternative": "false"})
+    return fetchApiJson(url, {"alternative": "false"})
 
 
-def get_play_data(user_id, recid):
+def get_play_data(recid):
     url = "stream/record/%s" % recid
-    return fetchApiJson(user_id, url)
+    return fetchApiJson(url)
 
 
-def get_records(user_id):
-    updated, content = check_records_updated(user_id)
+def get_records():
+    updated, content = check_records_updated()
 
     if updated:
-        broadcasts = fetch_records(user_id, content)
+        broadcasts = fetch_records(content)
     else:
         broadcasts = read_broadcasts()
 
@@ -167,7 +182,7 @@ def read_broadcasts():
     return broadcasts
 
 
-def check_records_updated(user_id):
+def check_records_updated():
     recordings = None
     if os.path.exists(RECORDINGS_FILE):
         with open(RECORDINGS_FILE, 'r') as f:
@@ -175,7 +190,7 @@ def check_records_updated(user_id):
             if s:
                 recordings = simplejson.loads(s)
 
-    content = fetchApiJson(user_id, "records/ready",
+    content = fetchApiJson("records/ready",
                            {"expand": "station",
                             "limit": 500,
                             "skip": 0})
@@ -188,7 +203,7 @@ def check_records_updated(user_id):
     return False, content
 
 
-def fetch_records(user_id, content):
+def fetch_records(content):
     old_broadcasts = read_broadcasts()
     broadcasts = {}
     for item in content["data"]["items"]:
@@ -196,8 +211,7 @@ def fetch_records(user_id, content):
         if broadcast_id in old_broadcasts:
             broadcast = old_broadcasts[broadcast_id]
         else:
-            broadcast = fetchApiJson(user_id,
-                                     "broadcasts/{}".format(broadcast_id),
+            broadcast = fetchApiJson("broadcasts/{}".format(broadcast_id),
                                      {"expand": "previewImage"})
         broadcasts[broadcast_id] = broadcast
     with open(RECORDINGS_BROADCASTS_FILE, 'w') as f:
@@ -205,6 +219,6 @@ def fetch_records(user_id, content):
     return broadcasts
 
 
-def delete_record(user_id, recid):
+def delete_record(recid):
     url = "records/%s" % recid
-    fetchApiJson(user_id, url, method="DELETE")
+    fetchApiJson(url, method="DELETE")
