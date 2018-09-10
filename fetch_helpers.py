@@ -7,7 +7,7 @@ import urllib
 import xbmcplugin
 import base64
 import requests
-from common import PLUGINID
+from common import RESOURCES_PATH
 from common import settings, pluginhandle
 
 
@@ -15,12 +15,8 @@ API_URL = "https://tv.api.teleboy.ch"
 API_KEY = base64.b64decode(
         "ZjBlN2JkZmI4MjJmYTg4YzBjN2ExM2Y3NTJhN2U4ZDVjMzc1N2ExM2Y3NTdhMTNmOWMwYzdhMTNmN2RmYjgyMg==")  # noqa: E501
 
-RESOURCES_PATH = xbmc.translatePath("special://home/addons" + PLUGINID + "/resources/")
 COOKIE_FILE = RESOURCES_PATH + "cookie.dat"
 USERID_FILE = RESOURCES_PATH + "userid.dat"
-
-if not os.path.exists(RESOURCES_PATH):
-    os.mkdir(RESOURCES_PATH)
 
 TB_URL = "https://www.teleboy.ch"
 

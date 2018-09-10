@@ -8,6 +8,7 @@ import simplejson
 from dateutil.parser import parse
 from common import PARAMETER_KEY_MODE, PARAMETER_KEY_ACTION, \
         MODE_RECORDINGS, \
+        RESOURCES_PATH, \
         PLUGINID, \
         pluginhandle
 from fetch_helpers import fetchApiJson
@@ -21,10 +22,8 @@ ACTION_PLAY_RECORDING = "playrec"
 ACTION_DELETE = "delete"
 ACTION_RECORDINGS_FOLDER = "recfolder"
 
-RECORDINGS_FILE = xbmc.translatePath(
-    "special://home/addons/" + PLUGINID + "/resources/recordings.dat")
-RECORDINGS_BROADCASTS_FILE = xbmc.translatePath(
-        "special://home/addons/" + PLUGINID + "/resources/recordings_broadcasts.dat")  # noqa: E501
+RECORDINGS_FILE = RESOURCES_PATH + "recordings.dat"
+RECORDINGS_BROADCASTS_FILE = RESOURCES_PATH + "recordings_broadcasts.dat"
 
 
 def handle_recording_view(params):
