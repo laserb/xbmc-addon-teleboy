@@ -26,6 +26,7 @@ TB_URL = "https://www.teleboy.ch"
 
 
 cookies = cookielib.LWPCookieJar(COOKIE_FILE)
+cookies_dict = requests.utils.dict_from_cookiejar(cookies)
 opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookies))
 urllib2.install_opener(opener)
 
@@ -50,6 +51,7 @@ def get_user_id():
 
 
 def login():
+    global cookies, cookies_dict
     cookies.clear()
     fetchHttp(TB_URL + "/login")
 
@@ -75,16 +77,14 @@ def login():
         xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=False)
         return False
     cookies.save(ignore_discard=True)
+    cookies_dict = requests.utils.dict_from_cookiejar(cookies)
 
     xbmc.log("login ok", level=xbmc.LOGNOTICE)
     return True
 
 
 def ensure_login():
-    global cookies
-    if not os.path.exists(COOKIE_FILE):
-        return login()
-    cookies_dict = requests.utils.dict_from_cookiejar(cookies)
+    global cookies_dict
     if "cinergy_auth" in cookies_dict and "cinergy_s" in cookies_dict:
         xbmc.log("Already logged in", level=xbmc.LOGNOTICE)
         return True
@@ -93,9 +93,8 @@ def ensure_login():
 
 
 def get_session_cookie():
-    global cookies
+    global cookies_dict
     ensure_login()
-    cookies_dict = requests.utils.dict_from_cookiejar(cookies)
     return cookies_dict["cinergy_s"]
 
 

@@ -61,17 +61,13 @@ def add_delete_option(recid, context_menu):
 
 
 def show_recordings():
-    broadcasts, content = get_records()
+    global broadcasts, recordings, recordings_dict
+    update_records()
 
-    titles = [item["title"] for item in content["data"]["items"]]
-    # create unique list of titles
-    titles = sorted(list(set(titles)))
-    titles = [title.encode("utf8") for title in titles]
-
-    for title in titles:
+    for title in sorted(recordings_dict):
         params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
                   PARAMETER_KEY_ACTION: ACTION_RECORDINGS_FOLDER,
-                  PARAMETER_KEY_FOLDER: title}
+                  PARAMETER_KEY_FOLDER: title.encode('utf8')}
         url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
         li = xbmcgui.ListItem(title)
 
@@ -109,15 +105,11 @@ def get_image(broadcasts, broadcast_id):
 
 
 def show_recordings_folder(params):
+    global broadcasts, recordings, recordings_dict
     folder = params.get(PARAMETER_KEY_FOLDER, "[0]")[0]
 
-    broadcasts, content = get_records()
-    items = content["data"]["items"]
-
     # filter items for current folder
-    items = [item for item in items if item["title"].encode("utf8") == folder]
-
-    for item in items:
+    for item in recordings_dict[folder.decode('utf8')]:
         # get ids
         recid = str(item["id"])
         broadcast_id = str(item["broadcast_id"])
@@ -210,28 +202,46 @@ def play_recording(recid, params):
     play_url(url, title, start_percent=start_percent)
 
 
-def get_records():
-    updated, content = check_records_updated()
+def get_recordings_dict():
+    global recordings
+    recordings_dict = {}
+    items = recordings["data"]["items"]
+
+    # filter items for current folder
+    items = [item for item in items]
+    for item in items:
+        item["title"] = item["title"]
+        title = item["title"]
+        if title not in recordings_dict:
+            recordings_dict[title] = []
+        recordings_dict[title].append(item)
+    return recordings_dict
+
+
+def update_records():
+    global broadcasts, recordings, recordings_dict
+    updated, recordings = check_records_updated()
 
     if updated:
-        broadcasts = fetch_records(content)
-    else:
-        broadcasts = read_broadcasts()
+        broadcasts = fetch_records()
+        recordings_dict = get_recordings_dict()
 
-    return broadcasts, content
+    return broadcasts, recordings
 
 
 def read_broadcasts():
-    broadcasts = {}
+    global broadcasts
+    if broadcasts:
+        return broadcasts
     if os.path.exists(RECORDINGS_BROADCASTS_FILE):
         with open(RECORDINGS_BROADCASTS_FILE, 'r') as f:
             s = f.read()
             if s:
                 broadcasts = simplejson.loads(s)
-    return broadcasts
 
 
-def check_records_updated():
+def read_recordings():
+    global recordings
     recordings = None
     if os.path.exists(RECORDINGS_FILE):
         with open(RECORDINGS_FILE, 'r') as f:
@@ -239,12 +249,16 @@ def check_records_updated():
             if s:
                 recordings = simplejson.loads(s)
 
+
+def check_records_updated():
+    global recordings
     content = fetchApiJson("records/ready",
                            {"expand": "station",
                             "limit": 500,
                             "skip": 0})
 
     if content != recordings:
+        recordings = content
         xbmc.log("updated", level=xbmc.LOGDEBUG)
         with open(RECORDINGS_FILE, 'w') as f:
             simplejson.dump(content, f)
@@ -252,10 +266,12 @@ def check_records_updated():
     return False, content
 
 
-def fetch_records(content):
-    old_broadcasts = read_broadcasts()
+def fetch_records():
+    global recordings, broadcasts
+    read_broadcasts()
+    old_broadcasts = broadcasts
     broadcasts = {}
-    for item in content["data"]["items"]:
+    for item in recordings["data"]["items"]:
         broadcast_id = str(item["broadcast_id"])
         if broadcast_id in old_broadcasts:
             broadcast = old_broadcasts[broadcast_id]
@@ -270,9 +286,19 @@ def fetch_records(content):
 
 def delete(recid):
     delete_record(recid)
+    update_records()
     xbmc.executebuiltin("Container.Refresh")
 
 
 def delete_record(recid):
     url = "records/%s" % recid
     fetchApiJson(url, method="DELETE")
+
+
+recordings_dict = {}
+broadcasts = {}
+recordings = []
+broadcasts = read_broadcasts()
+recordings = read_recordings()
+update_records()
+recordings_dict = get_recordings_dict()
