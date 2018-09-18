@@ -23,8 +23,14 @@ ACTION_RECORDINGS_FOLDER = "recfolder"
 
 RECORDINGS_FILE = xbmc.translatePath(
     "special://home/addons/" + PLUGINID + "/resources/recordings.dat")
+RECORDINGS_DICT_FILE = xbmc.translatePath(
+    "special://home/addons/" + PLUGINID + "/resources/recordings_dict.dat")
 RECORDINGS_BROADCASTS_FILE = xbmc.translatePath(
         "special://home/addons/" + PLUGINID + "/resources/recordings_broadcasts.dat")  # noqa: E501
+
+recordings_dict = {}
+broadcasts = {}
+recordings = []
 
 
 def handle_recording_view(params):
@@ -35,8 +41,15 @@ def handle_recording_view(params):
     elif action == ACTION_PLAY_RECORDING:
         play_recording(recid, params)
     elif action == ACTION_RECORDINGS_FOLDER:
+        read_recordings_dict()
+        read_broadcasts()
+        read_recordings()
         show_recordings_folder(params)
     else:
+        read_recordings_dict()
+        read_broadcasts()
+        read_recordings()
+        update_records()
         show_recordings()
 
 
@@ -104,73 +117,86 @@ def get_image(broadcasts, broadcast_id):
     return preview, image
 
 
+def create_recordings_entry(item):
+    # get ids
+    recid = str(item["id"])
+    broadcast_id = str(item["broadcast_id"])
+
+    # get title
+    title = item["title"].encode("utf8")
+    subtitle = item.get("subtitle", "").encode("utf8")
+
+    station = item["station"]["name"]
+
+    # get times
+    starttime = parse(item["begin"])
+    endtime = parse(item['end'])
+    duration = (endtime - starttime).total_seconds()
+
+    # get cast
+    cast = item.get('cast', '').split(',')
+    cast += item.get('anchor', '').split(',')
+
+    # set label
+    titlestring = '[B]{}[/B]'.format(title)
+    if subtitle:
+        titlestring += ' - {}'.format(subtitle)
+
+    datestring = starttime.strftime("%d.%m.%y %H:%M")
+    label = "{}[CR][COLOR darkgray]{} {}[/COLOR]".format(titlestring,
+                                                         datestring,
+                                                         station)
+
+    # set image
+    preview, image = get_image(broadcasts, broadcast_id)
+
+    # video info
+    entry = {
+        'recid': recid,
+        'label': label,
+        'title': title,
+        'plot': item['info_5'],
+        'plotoutline': item['info'],
+        'duration': duration,
+        'studio': station,
+        'genre': item['genre'],
+        'director': item.get('director', ''),
+        'episode': item.get('episode', ''),
+        'cast': cast,
+        'image': image,
+        'preview': preview
+    }
+    return entry
+
+
 def show_recordings_folder(params):
     global broadcasts, recordings, recordings_dict
     folder = params.get(PARAMETER_KEY_FOLDER, "[0]")[0]
 
     # filter items for current folder
-    for item in recordings_dict[folder.decode('utf8')]:
-        # get ids
-        recid = str(item["id"])
-        broadcast_id = str(item["broadcast_id"])
+    for entry in recordings_dict[folder.decode('utf8')]:
 
-        # get title
-        title = item["title"].encode("utf8")
-        subtitle = item.get("subtitle", "").encode("utf8")
-
-        station = item["station"]["name"]
-
-        # get times
-        starttime = parse(item["begin"])
-        endtime = parse(item['end'])
-        duration = (endtime - starttime).total_seconds()
-
-        # get cast
-        cast = item.get('cast', '').split(',')
-        cast += item.get('anchor', '').split(',')
-
-        # set label
-        titlestring = '[B]{}[/B]'.format(title)
-        if subtitle:
-            titlestring += ' - {}'.format(subtitle)
-
-        datestring = starttime.strftime("%d.%m.%y %H:%M")
-        label = "{}[CR][COLOR darkgray]{} {}[/COLOR]".format(titlestring,
-                                                             datestring,
-                                                             station)
-
-        # set image
-        preview, image = get_image(broadcasts, broadcast_id)
-
-        # video info
-        info = {
-            'title': title,
-            'plot': item['info_5'],
-            'plotoutline': item['info'],
-            'duration': duration,
-            'studio': station,
-            'genre': item['genre'],
-            'director': item.get('director', ''),
-            'episode': item.get('episode', ''),
-            'cast': cast
-        }
-
-        li = xbmcgui.ListItem(label, iconImage=preview, thumbnailImage=preview)
-        li.setArt({'thumb': preview, 'poster': image, 'fanart': image})
+        li = xbmcgui.ListItem(entry["label"],
+                              iconImage=entry["preview"],
+                              thumbnailImage=entry["preview"])
+        li.setArt({'thumb': entry["preview"],
+                   'poster': entry["image"],
+                   'fanart': entry["image"]})
         li.setProperty("Video", "true")
 
-        # show video information
-        li.setInfo('video', info)
+        # show video entry information
+        li.setInfo('video', entry)
+        li.setProperty("IsPlayable", "true")
 
         # add refresh option
         context_menu = add_refresh_option([])
-        context_menu = add_delete_option(recid, context_menu)
+        context_menu = add_delete_option(entry["recid"], context_menu)
         li.addContextMenuItems(context_menu)
 
         params = {PARAMETER_KEY_MODE: MODE_RECORDINGS,
                   PARAMETER_KEY_ACTION: ACTION_PLAY_RECORDING,
-                  PARAMETER_KEY_RECID: recid,
-                  PARAMETER_KEY_DURATION: duration}
+                  PARAMETER_KEY_RECID: entry["recid"],
+                  PARAMETER_KEY_DURATION: entry["duration"]}
         url = "{}?{}".format(sys.argv[0], urllib.urlencode(params))
         xbmcplugin.addDirectoryItem(handle=pluginhandle,
                                     url=url,
@@ -202,19 +228,35 @@ def play_recording(recid, params):
     play_url(url, title, start_percent=start_percent)
 
 
+def inverse_recordings_dict():
+    global recordings_dict
+    inverse = {}
+    for title in recordings_dict:
+        for entry in recordings_dict[title]:
+            inverse[entry["recid"]] = entry
+    return inverse
+
+
 def get_recordings_dict():
-    global recordings
+    global recordings_dict
+    inverse = inverse_recordings_dict()
     recordings_dict = {}
     items = recordings["data"]["items"]
 
     # filter items for current folder
     items = [item for item in items]
     for item in items:
-        item["title"] = item["title"]
         title = item["title"]
+        recid = item["id"]
+        if recid in inverse:
+            entry = inverse[recid]
+        else:
+            entry = create_recordings_entry(item)
         if title not in recordings_dict:
             recordings_dict[title] = []
-        recordings_dict[title].append(item)
+        recordings_dict[title].append(entry)
+    with open(RECORDINGS_DICT_FILE, 'w') as f:
+        simplejson.dump(recordings_dict, f)
     return recordings_dict
 
 
@@ -231,8 +273,7 @@ def update_records():
 
 def read_broadcasts():
     global broadcasts
-    if broadcasts:
-        return broadcasts
+    broadcasts = {}
     if os.path.exists(RECORDINGS_BROADCASTS_FILE):
         with open(RECORDINGS_BROADCASTS_FILE, 'r') as f:
             s = f.read()
@@ -248,6 +289,17 @@ def read_recordings():
             s = f.read()
             if s:
                 recordings = simplejson.loads(s)
+
+
+def read_recordings_dict():
+    xbmc.log("reading", level=xbmc.LOGNOTICE)
+    global recordings_dict
+    recordings_dict = {}
+    if os.path.exists(RECORDINGS_DICT_FILE):
+        with open(RECORDINGS_DICT_FILE, 'r') as f:
+            s = f.read()
+            if s:
+                recordings_dict = simplejson.loads(s)
 
 
 def check_records_updated():
@@ -268,7 +320,6 @@ def check_records_updated():
 
 def fetch_records():
     global recordings, broadcasts
-    read_broadcasts()
     old_broadcasts = broadcasts
     broadcasts = {}
     for item in recordings["data"]["items"]:
@@ -295,10 +346,3 @@ def delete_record(recid):
     fetchApiJson(url, method="DELETE")
 
 
-recordings_dict = {}
-broadcasts = {}
-recordings = []
-broadcasts = read_broadcasts()
-recordings = read_recordings()
-update_records()
-recordings_dict = get_recordings_dict()

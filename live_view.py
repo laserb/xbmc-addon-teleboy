@@ -72,6 +72,5 @@ def play_live(params):
 
     if not url:
         exit(1)
-    img = get_stationLogoURL(station)
 
-    play_url(url, title, img)
+    play_url(url, title)
