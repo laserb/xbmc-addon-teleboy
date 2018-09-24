@@ -292,7 +292,6 @@ def read_recordings():
 
 
 def read_recordings_dict():
-    xbmc.log("reading", level=xbmc.LOGNOTICE)
     global recordings_dict
     recordings_dict = {}
     if os.path.exists(RECORDINGS_DICT_FILE):
@@ -311,7 +310,6 @@ def check_records_updated():
 
     if content != recordings:
         recordings = content
-        xbmc.log("updated", level=xbmc.LOGDEBUG)
         with open(RECORDINGS_FILE, 'w') as f:
             simplejson.dump(content, f)
         return True, content
@@ -344,5 +342,3 @@ def delete(recid):
 def delete_record(recid):
     url = "records/%s" % recid
     fetchApiJson(url, method="DELETE")
-
-

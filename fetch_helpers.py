@@ -44,7 +44,7 @@ def get_user_id():
             dummy, uid = line.split("(")
             user_id = uid[:-1]
             break
-    xbmc.log("user id: " + user_id, level=xbmc.LOGNOTICE)
+    xbmc.log("user id: " + user_id, level=xbmc.LOGDEBUG)
 
     with open(USERID_FILE, "w") as f:
         f.write(user_id)
@@ -57,7 +57,7 @@ def login():
     cookies.clear()
     fetchHttp(TB_URL + "/login")
 
-    xbmc.log("logging in...", level=xbmc.LOGNOTICE)
+    xbmc.log("logging in...", level=xbmc.LOGDEBUG)
     login = settings.getSetting(id="login")
     password = settings.getSetting(id="password")
     url = TB_URL + "/login_check"
@@ -71,8 +71,8 @@ def login():
     if "Falsche Eingaben" in reply \
             or "Anmeldung war nicht erfolgreich" in reply \
             or "Bitte melde dich neu an" in reply:
-        xbmc.log("login failure", level=xbmc.LOGNOTICE)
-        xbmc.log(reply, level=xbmc.LOGNOTICE)
+        xbmc.log("login failure", level=xbmc.LOGDEBUG)
+        xbmc.log(reply, level=xbmc.LOGDEBUG)
         xbmc.executebuiltin("XBMC.Notification({},{})".format(
                 "Login Failure!",
                 "Please set your login/password in the addon settings"))
@@ -81,14 +81,14 @@ def login():
     cookies.save(ignore_discard=True)
     cookies_dict = requests.utils.dict_from_cookiejar(cookies)
 
-    xbmc.log("login ok", level=xbmc.LOGNOTICE)
+    xbmc.log("login ok", level=xbmc.LOGDEBUG)
     return True
 
 
 def ensure_login():
     global cookies_dict
     if "cinergy_auth" in cookies_dict and "cinergy_s" in cookies_dict:
-        xbmc.log("Already logged in", level=xbmc.LOGNOTICE)
+        xbmc.log("Already logged in", level=xbmc.LOGDEBUG)
         return True
     else:
         return login()
@@ -102,9 +102,9 @@ def get_session_cookie():
 
 def fetchHttp(url, args={}, hdrs={}, method="GET"):
     xbmc.log("fetchHttp(%s): %s" % (method, url),
-             level=xbmc.LOGNOTICE)
+             level=xbmc.LOGDEBUG)
     if args:
-        xbmc.log("args-keys: %s" % args.keys(), level=xbmc.LOGNOTICE)
+        xbmc.log("args-keys: %s" % args.keys(), level=xbmc.LOGDEBUG)
     hdrs["User-Agent"] = "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/20100101 Firefox/5.0"  # noqa: E501
     if method == "POST":
         req = urllib2.Request(url, urllib.urlencode(args), hdrs)
